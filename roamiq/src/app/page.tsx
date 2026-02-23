@@ -6,24 +6,59 @@ export default function HomePage() {
     <div>
       <section className="hero">
         <div className="hero-text">
-          <h1>AI Travel Planning Reinvented</h1>
+          <div className="badge">AI-Powered Travel Agents</div>
+
+          <h1>
+            Plan smarter.
+            <br />
+            Travel better.
+          </h1>
+
           <p>
-            Roamiq uses intelligent agents to transform simple ideas into
-            structured, optimized travel experiences.
+            Roamiq transforms simple travel ideas into structured,
+            optimized, AI-generated travel plans powered by intelligent agents.
           </p>
-          <Link href="/dashboard">
-            <button className="primary-btn">
-              Start Planning
-            </button>
-          </Link>
+
+          <div className="hero-buttons">
+            <Link href="/dashboard">
+              <button className="primary-btn">
+                Start Planning
+              </button>
+            </Link>
+
+            <Link href="/about">
+              <button className="secondary-btn">
+                Learn More
+              </button>
+            </Link>
+          </div>
         </div>
 
-        <Image
-          src="/globe.svg"
-          alt="Travel Illustration"
-          width={450}
-          height={350}
-        />
+        <div className="hero-image">
+          <Image
+            src="/globe.svg"
+            alt="Travel Illustration"
+            width={500}
+            height={400}
+          />
+        </div>
+      </section>
+
+      <section className="features">
+        <div className="feature-card">
+          <h3>🧠 AI Agents</h3>
+          <p>Autonomous planning agents that design your entire trip.</p>
+        </div>
+
+        <div className="feature-card">
+          <h3>⚡ Instant Planning</h3>
+          <p>From idea to structured itinerary in seconds.</p>
+        </div>
+
+        <div className="feature-card">
+          <h3>🌍 Optimized Experiences</h3>
+          <p>Budget, logistics, timing — everything calculated.</p>
+        </div>
       </section>
     </div>
   );
