@@ -1,9 +1,10 @@
 import "./globals.css";
 import Image from "next/image";
+import Link from "next/link";
 
 export const metadata = {
   title: "Roamiq",
-  description: "AI Travel Idea Engine",
+  description: "AI Travel Planning Platform",
 };
 
 export default function RootLayout({
@@ -13,34 +14,23 @@ export default function RootLayout({
 }) {
   return (
     <html lang="it">
-      <body style={{ margin: 0, fontFamily: "Arial, sans-serif" }}>
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            padding: "20px 40px",
-            borderBottom: "1px solid #eee",
-            backgroundColor: "#ffffff",
-          }}
-        >
-          <Image
-            src="/Logo.png"
-            alt="Roamiq Logo"
-            width={180}
-            height={50}
-            priority
-          />
-        </header>
+      <body>
+        <nav className="navbar">
+          <div className="nav-left">
+            <Image src="/Logo.png" alt="Roamiq" width={150} height={40} />
+          </div>
+          <div className="nav-right">
+            <Link href="/">Home</Link>
+            <Link href="/dashboard">Dashboard</Link>
+            <Link href="/about">About</Link>
+          </div>
+        </nav>
 
-        <main
-          style={{
-            maxWidth: "900px",
-            margin: "40px auto",
-            padding: "0 20px",
-          }}
-        >
-          {children}
-        </main>
+        <main className="container">{children}</main>
+
+        <footer className="footer">
+          © {new Date().getFullYear()} Roamiq — AI Travel Agents
+        </footer>
       </body>
     </html>
   );
