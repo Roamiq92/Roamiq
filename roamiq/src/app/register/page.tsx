@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabaseBrowser } from "../lib/supabase-browser";
 
 export default function RegisterPage() {
@@ -24,7 +25,7 @@ export default function RegisterPage() {
     if (error) {
       setError(error.message);
     } else {
-      setMessage("Account creato! Ora puoi fare login.");
+      setMessage("Account creato con successo! Ora puoi fare login.");
       setTimeout(() => {
         router.push("/login");
       }, 1500);
@@ -70,6 +71,13 @@ export default function RegisterPage() {
       {message && (
         <p style={{ color: "lightgreen", marginTop: 15 }}>{message}</p>
       )}
+
+      <p style={{ marginTop: 20, textAlign: "center" }}>
+        Hai già un account?{" "}
+        <Link href="/login" style={{ color: "#8b5cf6" }}>
+          Login
+        </Link>
+      </p>
     </div>
   );
 }
