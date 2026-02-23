@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabaseBrowser } from "../lib/supabase-browser";
 
 export default function LoginPage() {
@@ -62,6 +63,13 @@ export default function LoginPage() {
       {error && (
         <p style={{ color: "red", marginTop: 15 }}>{error}</p>
       )}
+
+      <p style={{ marginTop: 20, textAlign: "center" }}>
+        Non hai un account?{" "}
+        <Link href="/register" style={{ color: "#8b5cf6" }}>
+          Registrati
+        </Link>
+      </p>
     </div>
   );
 }
