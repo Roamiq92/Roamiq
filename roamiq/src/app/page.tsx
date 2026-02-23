@@ -21,20 +21,44 @@ export default async function Page() {
     .select("*")
     .order("created_at", { ascending: false });
 
-  return (
-    <div>
-      <h1>Build your next trip with AI</h1>
-      <h2>Insert a travel idea and let Roamiq evolve it</h2>
+return (
+  <div>
+    {/* HERO */}
+    <section style={{ marginBottom: "60px" }}>
+      <h1 style={{ fontSize: "42px", marginBottom: "20px" }}>
+        AI Travel Planner
+      </h1>
 
-      <form action={addIdea} style={{ marginBottom: "30px" }}>
-        <input
-          name="title"
-          placeholder="Es: Weekend a Lisbona low cost"
-          required
-          style={{ marginRight: "10px" }}
-        />
-        <button type="submit">Generate</button>
-      </form>
+      <p style={{ fontSize: "18px", color: "#666", maxWidth: "600px" }}>
+        Describe your dream trip and let Roamiq transform it into a structured
+        travel plan powered by AI agents.
+      </p>
+    </section>
+
+    {/* INPUT SECTION */}
+    <section style={{ marginBottom: "50px" }}>
+      <div className="card" style={{ padding: "30px" }}>
+        <form action={addIdea}>
+          <input
+            name="title"
+            placeholder="Es: Weekend romantico a Parigi con budget 800€"
+            required
+            style={{ marginRight: "10px", width: "60%" }}
+          />
+          <button type="submit">Generate Plan</button>
+        </form>
+      </div>
+    </section>
+
+    {/* IDEAS LIST */}
+    <section>
+      <h2 style={{ marginBottom: "20px" }}>Your Travel Ideas</h2>
+
+      {ideas?.length === 0 && (
+        <div style={{ color: "#999" }}>
+          No travel ideas yet. Start creating one.
+        </div>
+      )}
 
       {ideas?.map((idea) => (
         <div key={idea.id} className="card">
@@ -44,6 +68,6 @@ export default async function Page() {
           </div>
         </div>
       ))}
-    </div>
-  );
-}
+    </section>
+  </div>
+);
