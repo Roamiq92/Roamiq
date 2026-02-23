@@ -1,4 +1,5 @@
 import { supabase } from "./lib/supabase";
+import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,8 @@ async function addIdea(formData: FormData) {
   if (!title) return;
 
   await supabase.from("ideas").insert([{ title }]);
+
+  revalidatePath("/");
 }
 
 export default async function Page() {
@@ -26,6 +29,7 @@ export default async function Page() {
         <input
           name="title"
           placeholder="Scrivi una nuova idea..."
+          required
           style={{ padding: "8px", marginRight: "10px" }}
         />
         <button type="submit">Aggiungi</button>
