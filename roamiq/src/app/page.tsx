@@ -1,13 +1,28 @@
 import { supabase } from "./lib/supabase";
 
+export const dynamic = "force-dynamic";
+
 export default async function Page() {
-  const { data, error } = await supabase.from("ideas").select("*");
+  const { data: ideas, error } = await supabase
+    .from("ideas")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return <div>Errore nel caricamento</div>;
+  }
 
   return (
     <div style={{ padding: "40px" }}>
-      <h1>ROAMIQ DEBUG</h1>
+      <h1>ROAMIQ</h1>
 
-      <pre>{JSON.stringify({ data, error }, null, 2)}</pre>
+      <h2>Ideas:</h2>
+
+      {ideas?.map((idea) => (
+        <div key={idea.id}>
+          • {idea.title}
+        </div>
+      ))}
     </div>
   );
 }
