@@ -1,21 +1,31 @@
-import { redirect } from "next/navigation";
-import { createClient } from "../lib/supabase";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabase";
+import { useRouter } from "next/navigation";
 
-export default async function Dashboard() {
-  const supabase = createClient();
+export default function Dashboard() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/login");
-  }
+      if (!data.user) {
+        router.push("/login");
+      } else {
+        setUser(data.user);
+      }
+    };
+
+    getUser();
+  }, []);
+
+  if (!user) return <p>Loading...</p>;
 
   return (
-    <div>
+    <div style={{ padding: 40 }}>
       <h1>Dashboard</h1>
       <p>Benvenuto {user.email}</p>
     </div>
