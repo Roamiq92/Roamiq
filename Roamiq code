@@ -1,0 +1,1306 @@
+// package.json
+{
+  "name": "roamiq",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "@radix-ui/react-accordion": "^1.1.2",
+    "@radix-ui/react-avatar": "^1.0.4",
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-dropdown-menu": "^2.0.6",
+    "@radix-ui/react-label": "^2.0.2",
+    "@radix-ui/react-popover": "^1.0.7",
+    "@radix-ui/react-progress": "^1.0.3",
+    "@radix-ui/react-select": "^2.0.0",
+    "@radix-ui/react-separator": "^1.0.3",
+    "@radix-ui/react-slider": "^1.1.2",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@radix-ui/react-tabs": "^1.0.4",
+    "@radix-ui/react-toast": "^1.1.5",
+    "@supabase/supabase-js": "^2.43.1",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "framer-motion": "^11.2.6",
+    "lucide-react": "^0.379.0",
+    "next": "14.2.3",
+    "openai": "^4.47.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.3.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.23.8",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "prisma": "^5.14.0",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.4.5"
+  }
+}
+// next.config.mjs
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  // Redirect roamiq.eu to roamiq.it
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'roamiq.eu',
+          },
+        ],
+        destination: 'https://roamiq.it/:path*',
+        permanent: true,
+      },
+      {
+        source: '/:path*',
+        has: [
+          {
+            type: 'host',
+            value: 'www.roamiq.eu',
+          },
+        ],
+        destination: 'https://roamiq.it/:path*',
+        permanent: true,
+      },
+    ];
+  },
+  
+  // Security headers
+  async headers() {
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on'
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload'
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN'
+          },
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff'
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'origin-when-cross-origin'
+          },
+        ],
+      },
+    ];
+  },
+
+  images: {
+    domains: ['images.unsplash.com', 'res.cloudinary.com'],
+    formats: ['image/avif', 'image/webp'],
+  },
+
+  // Optimize production build
+  swcMinify: true,
+  reactStrictMode: true,
+  
+  // Environment variables pubbliche
+  env: {
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'https://roamiq.it',
+  },
+};
+
+export default nextConfig;
+// tailwind.config.ts
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+};
+
+export default config;
+/* src/app/globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 238 76% 58%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 238 76% 58%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 238 76% 58%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 238 76% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-secondary;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/50;
+}
+// tsconfig.json
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
+# .env.local (CREA QUESTO FILE - NON COMMITTARE SU GIT!)
+
+# Database (Supabase)
+DATABASE_URL="postgresql://..."
+DIRECT_URL="postgresql://..."
+
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL="https://xxx.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..."
+SUPABASE_SERVICE_ROLE_KEY="eyJ..."
+
+# OpenAI
+OPENAI_API_KEY="sk-..."
+
+# Site
+NEXT_PUBLIC_SITE_URL="https://roamiq.it"
+
+# Security
+NEXTAUTH_SECRET="genera-una-stringa-random-molto-lunga"
+# .gitignore
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# prisma
+prisma/migrations
+# 1. Crea cartella progetto
+mkdir roamiq
+cd roamiq
+
+# 2. Inizializza Next.js
+npx create-next-app@latest . --typescript --tailwind --app --no-src-dir
+
+# 3. Installa dipendenze (copia il package.json sopra e poi:)
+npm install
+
+# 4. Setup Prisma
+npx prisma init
+
+# 5. Avvia sviluppo
+npm run dev
+// src/lib/security/rate-limit.ts
+import { headers } from 'next/headers';
+
+const ratelimit = new Map<string, { count: number; resetTime: number }>();
+
+export async function rateLimit(identifier: string, limit: number = 10) {
+  const now = Date.now();
+  const windowMs = 60000; // 1 minuto
+
+  const record = ratelimit.get(identifier);
+
+  if (!record || now > record.resetTime) {
+    ratelimit.set(identifier, { count: 1, resetTime: now + windowMs });
+    return { success: true, remaining: limit - 1 };
+  }
+
+  if (record.count >= limit) {
+    return { success: false, remaining: 0 };
+  }
+
+  record.count++;
+  return { success: true, remaining: limit - record.count };
+}
+
+export async function getClientIdentifier() {
+  const headersList = headers();
+  const forwarded = headersList.get('x-forwarded-for');
+  const ip = forwarded ? forwarded.split(',')[0] : 'unknown';
+  return ip;
+}
+// src/middleware.ts - Protezione globale
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export function middleware(request: NextRequest) {
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  
+  // Content Security Policy
+  const cspHeader = `
+    default-src 'self';
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' blob: data: https:;
+    font-src 'self';
+    connect-src 'self' https://api.openai.com https://*.supabase.co;
+    frame-ancestors 'none';
+    base-uri 'self';
+    form-action 'self';
+  `.replace(/\s{2,}/g, ' ').trim();
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', cspHeader);
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+
+  response.headers.set('Content-Security-Policy', cspHeader);
+  
+  return response;
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
+};
+// src/components/ui/button.tsx
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
+import { cn } from "@/lib/utils"
+
+const buttonVariants = cva(
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline:
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        icon: "h-10 w-10",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
+
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean
+}
+
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = "Button"
+
+export { Button, buttonVariants }
+// src/components/ui/input.tsx
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+export interface InputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, ...props }, ref) => {
+    return (
+      <input
+        type={type}
+        className={cn(
+          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Input.displayName = "Input"
+
+export { Input }
+// src/components/ui/card.tsx
+import * as React from "react"
+import { cn } from "@/lib/utils"
+
+const Card = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      className
+    )}
+    {...props}
+  />
+))
+Card.displayName = "Card"
+
+const CardHeader = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    {...props}
+  />
+))
+CardHeader.displayName = "CardHeader"
+
+const CardTitle = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLHeadingElement>
+>(({ className, ...props }, ref) => (
+  <h3
+    ref={ref}
+    className={cn(
+      "text-2xl font-semibold leading-none tracking-tight",
+      className
+    )}
+    {...props}
+  />
+))
+CardTitle.displayName = "CardTitle"
+
+const CardDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <p
+    ref={ref}
+    className={cn("text-sm text-muted-foreground", className)}
+    {...props}
+  />
+))
+CardDescription.displayName = "CardDescription"
+
+const CardContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div ref={ref} className={cn("p-6 pt-0", className)} {...props} />
+))
+CardContent.displayName = "CardContent"
+
+const CardFooter = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("flex items-center p-6 pt-0", className)}
+    {...props}
+  />
+))
+CardFooter.displayName = "CardFooter"
+
+export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+// src/components/ui/progress.tsx
+import * as React from "react"
+import * as ProgressPrimitive from "@radix-ui/react-progress"
+import { cn } from "@/lib/utils"
+
+const Progress = React.forwardRef<
+  React.ElementRef<typeof ProgressPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>
+>(({ className, value, ...props }, ref) => (
+  <ProgressPrimitive.Root
+    ref={ref}
+    className={cn(
+      "relative h-4 w-full overflow-hidden rounded-full bg-secondary",
+      className
+    )}
+    {...props}
+  >
+    <ProgressPrimitive.Indicator
+      className="h-full w-full flex-1 bg-primary transition-all"
+      style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+    />
+  </ProgressPrimitive.Root>
+))
+Progress.displayName = ProgressPrimitive.Root.displayName
+
+export { Progress }
+// src/components/ui/label.tsx
+import * as React from "react"
+import * as LabelPrimitive from "@radix-ui/react-label"
+import { cva, type VariantProps } from "class-variance-authority"
+import { cn } from "@/lib/utils"
+
+const labelVariants = cva(
+  "text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+)
+
+const Label = React.forwardRef<
+  React.ElementRef<typeof LabelPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root> &
+    VariantProps<typeof labelVariants>
+>(({ className, ...props }, ref) => (
+  <LabelPrimitive.Root
+    ref={ref}
+    className={cn(labelVariants(), className)}
+    {...props}
+  />
+))
+Label.displayName = LabelPrimitive.Root.displayName
+
+export { Label }
+// src/components/ui/select.tsx
+import * as React from "react"
+import * as SelectPrimitive from "@radix-ui/react-select"
+import { Check, ChevronDown, ChevronUp } from "lucide-react"
+import { cn } from "@/lib/utils"
+
+const Select = SelectPrimitive.Root
+const SelectGroup = SelectPrimitive.Group
+const SelectValue = SelectPrimitive.Value
+
+const SelectTrigger = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Trigger>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Trigger
+    ref={ref}
+    className={cn(
+      "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
+      className
+    )}
+    {...props}
+  >
+    {children}
+    <SelectPrimitive.Icon asChild>
+      <ChevronDown className="h-4 w-4 opacity-50" />
+    </SelectPrimitive.Icon>
+  </SelectPrimitive.Trigger>
+))
+SelectTrigger.displayName = SelectPrimitive.Trigger.displayName
+
+const SelectContent = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
+>(({ className, children, position = "popper", ...props }, ref) => (
+  <SelectPrimitive.Portal>
+    <SelectPrimitive.Content
+      ref={ref}
+      className={cn(
+        "relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        position === "popper" &&
+          "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
+        className
+      )}
+      position={position}
+      {...props}
+    >
+      <SelectPrimitive.Viewport
+        className={cn(
+          "p-1",
+          position === "popper" &&
+            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+        )}
+      >
+        {children}
+      </SelectPrimitive.Viewport>
+    </SelectPrimitive.Content>
+  </SelectPrimitive.Portal>
+))
+SelectContent.displayName = SelectPrimitive.Content.displayName
+
+const SelectItem = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Item>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
+>(({ className, children, ...props }, ref) => (
+  <SelectPrimitive.Item
+    ref={ref}
+    className={cn(
+      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      className
+    )}
+    {...props}
+  >
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+      <SelectPrimitive.ItemIndicator>
+        <Check className="h-4 w-4" />
+      </SelectPrimitive.ItemIndicator>
+    </span>
+    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+  </SelectPrimitive.Item>
+))
+SelectItem.displayName = SelectPrimitive.Item.displayName
+
+export {
+  Select,
+  SelectGroup,
+  SelectValue,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+}
+// src/lib/utils.ts
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(date)
+}
+
+export function formatCurrency(amount: number, currency: string = 'EUR'): string {
+  return new Intl.NumberFormat('it-IT', {
+    style: 'currency',
+    currency,
+  }).format(amount)
+}
+// src/app/onboarding/page.tsx
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Progress } from '@/components/ui/progress';
+import Step1Basic from '@/components/onboarding/Step1Basic';
+import Step2Interests from '@/components/onboarding/Step2Interests';
+import Step3Budget from '@/components/onboarding/Step3Budget';
+import Step4TravelStyle from '@/components/onboarding/Step4TravelStyle';
+import Step5Destination from '@/components/onboarding/Step5Destination';
+
+export interface OnboardingData {
+  // Step 1
+  name: string;
+  age: number;
+  travelers: number;
+  travelWith: string[];
+  
+  // Step 2
+  interests: string[];
+  
+  // Step 3
+  budgetLevel: string;
+  budgetAmount?: number;
+  
+  // Step 4
+  travelPace: string;
+  accommodation: string[];
+  dietaryReqs: string[];
+  
+  // Step 5
+  destination: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  duration: number;
+}
+
+const TOTAL_STEPS = 5;
+
+export default function OnboardingPage() {
+  const router = useRouter();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [data, setData] = useState<OnboardingData>({
+    name: '',
+    age: 0,
+    travelers: 1,
+    travelWith: [],
+    interests: [],
+    budgetLevel: 'moderate',
+    travelPace: 'moderate',
+    accommodation: [],
+    dietaryReqs: [],
+    destination: '',
+    startDate: null,
+    endDate: null,
+    duration: 3,
+  });
+
+  const updateData = (newData: Partial<OnboardingData>) => {
+    setData((prev) => ({ ...prev, ...newData }));
+  };
+
+  const nextStep = () => {
+    if (currentStep < TOTAL_STEPS) {
+      setCurrentStep((prev) => prev + 1);
+    } else {
+      handleComplete();
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep((prev) => prev - 1);
+    }
+  };
+
+  const handleComplete = async () => {
+    // Save to backend and generate trip
+    try {
+      const response = await fetch('/api/trips/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+      
+      if (result.tripId) {
+        router.push(`/trip/${result.tripId}`);
+      }
+    } catch (error) {
+      console.error('Error generating trip:', error);
+    }
+  };
+
+  const progress = (currentStep / TOTAL_STEPS) * 100;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12">
+      <div className="container max-w-3xl mx-auto px-4">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Crea il tuo viaggio perfetto
+            </h1>
+            <span className="text-sm text-gray-500">
+              Step {currentStep} di {TOTAL_STEPS}
+            </span>
+          </div>
+          <Progress value={progress} className="h-2" />
+        </div>
+
+        {/* Steps */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentStep}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {currentStep === 1 && (
+              <Step1Basic data={data} updateData={updateData} onNext={nextStep} />
+            )}
+            {currentStep === 2 && (
+              <Step2Interests
+                data={data}
+                updateData={updateData}
+                onNext={nextStep}
+                onBack={prevStep}
+              />
+            )}
+            {currentStep === 3 && (
+              <Step3Budget
+                data={data}
+                updateData={updateData}
+                onNext={nextStep}
+                onBack={prevStep}
+              />
+            )}
+            {currentStep === 4 && (
+              <Step4TravelStyle
+                data={data}
+                updateData={updateData}
+                onNext={nextStep}
+                onBack={prevStep}
+              />
+            )}
+            {currentStep === 5 && (
+              <Step5Destination
+                data={data}
+                updateData={updateData}
+                onNext={nextStep}
+                onBack={prevStep}
+              />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+// src/components/onboarding/Step1Basic.tsx
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useState } from 'react';
+import { Users, User, Heart, UserPlus } from 'lucide-react';
+import { OnboardingData } from '@/app/onboarding/page';
+
+interface Props {
+  data: OnboardingData;
+  updateData: (data: Partial<OnboardingData>) => void;
+  onNext: () => void;
+}
+
+const travelWithOptions = [
+  { value: 'solo', label: 'Solo', icon: User },
+  { value: 'partner', label: 'Partner', icon: Heart },
+  { value: 'friends', label: 'Amici', icon: Users },
+  { value: 'family', label: 'Famiglia', icon: UserPlus },
+];
+
+export default function Step1Basic({ data, updateData, onNext }: Props) {
+  const [name, setName] = useState(data.name);
+  const [age, setAge] = useState(data.age || '');
+  const [travelers, setTravelers] = useState(data.travelers);
+  const [travelWith, setTravelWith] = useState<string[]>(data.travelWith);
+
+  const toggleTravelWith = (value: string) => {
+    if (travelWith.includes(value)) {
+      setTravelWith(travelWith.filter((v) => v !== value));
+    } else {
+      setTravelWith([...travelWith, value]);
+    }
+  };
+
+  const handleNext = () => {
+    updateData({ name, age: Number(age), travelers, travelWith });
+    onNext();
+  };
+
+  const isValid = name.length > 0 && age && travelers > 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Parliamo di te</CardTitle>
+        <CardDescription>
+          Aiutaci a conoscerti per creare un viaggio su misura
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="name">Come ti chiami?</Label>
+          <Input
+            id="name"
+            placeholder="Il tuo nome"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="age">Età</Label>
+            <Input
+              id="age"
+              type="number"
+              placeholder="25"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              min="18"
+              max="100"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="travelers">Quanti siete?</Label>
+            <Input
+              id="travelers"
+              type="number"
+              value={travelers}
+              onChange={(e) => setTravelers(Number(e.target.value))}
+              min="1"
+              max="20"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <Label>Con chi viaggi?</Label>
+          <div className="grid grid-cols-2 gap-3">
+            {travelWithOptions.map((option) => {
+              const Icon = option.icon;
+              const isSelected = travelWith.includes(option.value);
+              
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => toggleTravelWith(option.value)}
+                  className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${
+                    isSelected
+                      ? 'border-indigo-600 bg-indigo-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 ${isSelected ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <span className={`font-medium ${isSelected ? 'text-indigo-900' : 'text-gray-700'}`}>
+                    {option.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <Button
+          onClick={handleNext}
+          disabled={!isValid}
+          className="w-full"
+          size="lg"
+        >
+          Continua
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+// src/components/onboarding/Step2Interests.tsx
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+import { OnboardingData } from '@/app/onboarding/page';
+import {
+  Palette,
+  UtensilsCrossed,
+  Mountain,
+  Music,
+  Camera,
+  Ship,
+  Building2,
+  Leaf,
+  ShoppingBag,
+  Sunset,
+  Waves,
+  Footprints,
+} from 'lucide-react';
+
+interface Props {
+  data: OnboardingData;
+  updateData: (data: Partial<OnboardingData>) => void;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+const interestOptions = [
+  { value: 'culture', label: 'Arte & Cultura', icon: Palette, color: 'bg-purple-100 text-purple-600' },
+  { value: 'food', label: 'Food & Wine', icon: UtensilsCrossed, color: 'bg-orange-100 text-orange-600' },
+  { value: 'adventure', label: 'Avventura', icon: Mountain, color: 'bg-green-100 text-green-600' },
+  { value: 'nightlife', label: 'Nightlife', icon: Music, color: 'bg-pink-100 text-pink-600' },
+  { value: 'photography', label: 'Fotografia', icon: Camera, color: 'bg-blue-100 text-blue-600' },
+  { value: 'beach', label: 'Mare & Relax', icon: Waves, color: 'bg-cyan-100 text-cyan-600' },
+  { value: 'history', label: 'Storia', icon: Building2, color: 'bg-amber-100 text-amber-600' },
+  { value: 'nature', label: 'Natura', icon: Leaf, color: 'bg-emerald-100 text-emerald-600' },
+  { value: 'shopping', label: 'Shopping', icon: ShoppingBag, color: 'bg-rose-100 text-rose-600' },
+  { value: 'sunset', label: 'Panorami', icon: Sunset, color: 'bg-yellow-100 text-yellow-600' },
+  { value: 'cruise', label: 'Crociere', icon: Ship, color: 'bg-indigo-100 text-indigo-600' },
+  { value: 'trekking', label: 'Trekking', icon: Footprints, color: 'bg-lime-100 text-lime-600' },
+];
+
+export default function Step2Interests({ data, updateData, onNext, onBack }: Props) {
+  const [interests, setInterests] = useState<string[]>(data.interests);
+
+  const toggleInterest = (value: string) => {
+    if (interests.includes(value)) {
+      setInterests(interests.filter((v) => v !== value));
+    } else {
+      setInterests([...interests, value]);
+    }
+  };
+
+  const handleNext = () => {
+    updateData({ interests });
+    onNext();
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Cosa ti appassiona?</CardTitle>
+        <CardDescription>
+          Seleziona i tuoi interessi (minimo 3, massimo 6)
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {interestOptions.map((option) => {
+            const Icon = option.icon;
+            const isSelected = interests.includes(option.value);
+            
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => toggleInterest(option.value)}
+                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                  isSelected
+                    ? 'border-indigo-600 shadow-md scale-105'
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <div className={`p-3 rounded-full ${isSelected ? option.color : 'bg-gray-100'}`}>
+                  <Icon className="w-6 h-6" />
+                </div>
+                <span className={`text-sm font-medium text-center ${
+                  isSelected ? 'text-indigo-900' : 'text-gray-700'
+                }`}>
+                  {option.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex gap-3">
+          <Button onClick={onBack} variant="outline" size="lg">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Indietro
+          </Button>
+          <Button
+            onClick={handleNext}
+            disabled={interests.length < 3 || interests.length > 6}
+            className="flex-1"
+            size="lg"
+          >
+            Continua {interests.length > 0 && `(${interests.length})`}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+// src/components/onboarding/Step3Budget.tsx
+'use client';
+
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+import { OnboardingData } from '@/app/onboarding/page';
+import { Wallet, Coins, Gem } from 'lucide-react';
+
+interface Props {
+  data: OnboardingData;
+  updateData: (data: Partial<OnboardingData>) => void;
+  onNext: () => void;
+  onBack: () => void;
+}
+
+const budgetOptions = [
+  {
+    value: 'budget',
+    label: 'Budget',
+    description: 'Ostelli, street food, trasporti pubblici',
+    range: '€30-60/giorno',
+    icon: Wallet,
+    color: 'from-green-400 to-green-600',
+  },
+  {
+    value: 'moderate',
+    label: 'Moderato',
+    description: 'Hotel 3*, ristoranti locali, mix di trasporti',
+    range: '€80-150/giorno',
+    icon: Coins,
+    color: 'from-blue-400 to-blue-600',
+  },
+  {
+    value: 'luxury',
+    label: 'Luxury',
+    description: 'Hotel 4-5*, fine dining, esperienze premium',
+    range: '€200+/giorno',
+    icon: Gem,
+    color: 'from-purple-400 to-purple-600',
+  },
+];
+
+export default function Step3Budget({ data, updateData, onNext, onBack }: Props) {
+  const [budgetLevel, setBudgetLevel] = useState(data.budgetLevel);
+
+  const handleNext = () => {
+    updateData({ budgetLevel });
+    onNext();
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Qual è il tuo budget?</CardTitle>
+        <CardDescription>
+          Ci aiuta a trovare le migliori opzioni per te
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="space-y-4">
+          {budgetOptions.map((option) => {
+            const Icon = option.icon;
+            const isSelected = budgetLevel === option.value;
+            
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setBudgetLevel(option.value)}
+                className={`w-full flex items-start gap-4 p-6 rounded-xl border-2 transition-all text-left ${
+                  isSelected
+                    ? 'border-indigo-600 shadow-lg bg-indigo-50'
+                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                }`}
+              >
+                <div className={`p-3 rounded-full bg-gradient-to-br ${option.color} text-white`}>
+                  <Icon className="w-6 h-6" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-semibold text-lg">{option.label}</h3>
+                    <span className="text-sm font-medium text-indigo-600">{option.range}</span>
+                  </div>
+                  <p className="text-sm text-gray-600">{option.description}</p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-800">
+            💡 <strong>Nota:</strong> Il budget è per persona e include alloggio, cibo, trasporti ed esperienze. 
+            Voli internazionali esclusi.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <Button onClick={onBack} variant="outline" size="lg">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Indietro
+          </Button>
+          <Button onClick={handleNext} className="flex-1" size="lg">
+            Continua
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
