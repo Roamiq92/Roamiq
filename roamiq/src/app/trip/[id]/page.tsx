@@ -1,30 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabaseBrowser } from "../../../lib/supabase-browser";
 import { useParams } from "next/navigation";
+import { supabaseBrowser } from "../../../lib/supabase-browser";
 
 export default function TripPage() {
   const params = useParams();
-  const tripId = params.id;
+  const tripId = params?.id as string;
 
   const [trip, setTrip] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [itinerary, setItinerary] = useState<any>(null);
   const [generating, setGenerating] = useState(false);
+  const [itinerary, setItinerary] = useState<any>(null);
 
   useEffect(() => {
     loadTrip();
   }, []);
 
   const loadTrip = async () => {
-    const { data } = await supabaseBrowser
+    const { data, error } = await supabaseBrowser
       .from("trip_requests")
       .select("*")
       .eq("id", tripId)
       .single();
 
-    setTrip(data);
+    if (!error) setTrip(data);
     setLoading(false);
   };
 
@@ -33,12 +33,13 @@ export default function TripPage() {
 
     const res = await fetch("/api/generate-itinerary", {
       method: "POST",
-      body: JSON.stringify(trip),
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(trip)
     });
 
-    const data = await res.json();
-    setItinerary(data);
+    const result = await res.json();
+    setItinerary(result);
+
     setGenerating(false);
   };
 
@@ -46,24 +47,26 @@ export default function TripPage() {
 
   return (
     <div className="min-h-screen text-white px-6 py-20">
-      <h1 className="text-4xl font-bold mb-2">
+      <h1 className="text-4xl font-bold mb-4">
         Viaggio a {trip.destination}
       </h1>
-      <p className="text-gray-400 mb-8">
-        {trip.num_travelers} viaggiatori – Budget €{trip.budget_total}
+
+      <p className="text-gray-400 mb-6">
+        {trip.num_travelers} viaggiatori • Budget €{trip.budget_total}
       </p>
 
       {!itinerary ? (
         <button
+          className="btn-primary text-lg px-10 py-4"
           onClick={generateItinerary}
-          className="btn-primary text-xl px-10 py-4"
           disabled={generating}
         >
           {generating ? "Generazione in corso..." : "Genera Itinerario AI"}
         </button>
       ) : (
-        <div className="mt-10 space-y-10">
-          <pre className="bg-black/40 p-6 rounded-xl overflow-x-auto text-sm">
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold mb-4">Itinerario Generato</h2>
+          <pre className="bg-black/40 rounded-xl p-6 text-sm whitespace-pre-wrap">
             {JSON.stringify(itinerary, null, 2)}
           </pre>
         </div>
