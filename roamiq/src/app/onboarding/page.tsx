@@ -208,87 +208,110 @@ export default function OnboardingPage() {
 
           {/* Step 2: Date & Viaggiatori */}
           {currentStep === 2 && (
-            <div className="animate-fade-in">
-              <div className="text-center mb-10">
-                <span className="text-6xl mb-4 block">📅</span>
-                <h1 className="text-3xl md:text-4xl font-bold mb-3">Quando e con chi?</h1>
-                <p className="text-gray-400 text-lg">Dicci le date e chi ti accompagna</p>
-              </div>
-              
-              <div className="space-y-6">
-                {/* Date */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">Data partenza</label>
-                    <input
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) => updateFormData('startDate', e.target.value)}
-                      className="input-field"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">Data ritorno</label>
-                    <input
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(e) => updateFormData('endDate', e.target.value)}
-                      className="input-field"
-                    />
-                  </div>
-                </div>
+  <div className="animate-fade-in">
+    <div className="text-center mb-10">
+      <span className="text-6xl mb-4 block">📅</span>
+      <h1 className="text-3xl md:text-4xl font-bold mb-3">
+        Quando e da dove parti?
+      </h1>
+      <p className="text-gray-400 text-lg">
+        Inserisci le informazioni sulle date e la tua città di partenza
+      </p>
+    </div>
 
-                {/* Numero viaggiatori */}
-                <div>
-                  <label className="block text-sm text-gray-400 mb-3">Quanti siete?</label>
-                  <div className="flex items-center justify-center gap-4">
-                    <button
-                      onClick={() => updateFormData('numTravelers', Math.max(1, formData.numTravelers - 1))}
-                      className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-xl transition"
-                    >
-                      -
-                    </button>
-                    <span className="text-4xl font-bold w-16 text-center">{formData.numTravelers}</span>
-                    <button
-                      onClick={() => updateFormData('numTravelers', formData.numTravelers + 1)}
-                      className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-xl transition"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
+    <div className="space-y-6">
+      {/* Città/Aeroporto di partenza */}
+      <div>
+        <label className="block text-sm text-gray-400 mb-2">
+          Città o aeroporto di partenza
+        </label>
+        <input
+          type="text"
+          placeholder="es. Milano, Roma Fiumicino, Venezia..."
+          value={formData.departureCity || ""}
+          onChange={(e) => updateFormData("departureCity", e.target.value)}
+          required
+          className="input-field"
+        />
+      </div>
 
-                {/* Tipo di compagnia */}
-                <div>
-                  <label className="block text-sm text-gray-400 mb-3">Con chi viaggi?</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    {[
-                      { id: 'solo', label: 'Da solo', icon: '🧑' },
-                      { id: 'coppia', label: 'In coppia', icon: '💑' },
-                      { id: 'famiglia', label: 'Famiglia', icon: '👨‍👩‍👧‍👦' },
-                      { id: 'amici', label: 'Amici', icon: '👯' },
-                      { id: 'lavoro', label: 'Lavoro', icon: '💼' },
-                      { id: 'altro', label: 'Altro', icon: '👥' },
-                    ].map((option) => (
-                      <button
-                        key={option.id}
-                        onClick={() => updateFormData('travelCompanions', option.id)}
-                        className={`p-4 rounded-xl text-center transition ${
-                          formData.travelCompanions === option.id
-                            ? 'bg-orange-500 text-white'
-                            : 'bg-white/5 hover:bg-white/10'
-                        }`}
-                      >
-                        <span className="text-2xl block mb-1">{option.icon}</span>
-                        <span className="text-sm">{option.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+      {/* Date */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm text-gray-400 mb-2">Data partenza</label>
+          <input
+            type="date"
+            value={formData.startDate}
+            onChange={(e) => updateFormData("startDate", e.target.value)}
+            className="input-field"
+          />
+        </div>
+        <div>
+          <label className="block text-sm text-gray-400 mb-2">Data ritorno</label>
+          <input
+            type="date"
+            value={formData.endDate}
+            onChange={(e) => updateFormData("endDate", e.target.value)}
+            className="input-field"
+          />
+        </div>
+      </div>
 
+      {/* Numero viaggiatori */}
+      <div>
+        <label className="block text-sm text-gray-400 mb-3">Quanti siete?</label>
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={() =>
+              updateFormData("numTravelers", Math.max(1, formData.numTravelers - 1))
+            }
+            className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-xl transition"
+          >
+            -
+          </button>
+          <span className="text-4xl font-bold w-16 text-center">
+            {formData.numTravelers}
+          </span>
+          <button
+            onClick={() => updateFormData("numTravelers", formData.numTravelers + 1)}
+            className="w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 text-xl transition"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
+      {/* Tipo di compagnia */}
+      <div>
+        <label className="block text-sm text-gray-400 mb-3">Con chi viaggi?</label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[
+            { id: "solo", label: "Da solo", icon: "🧑" },
+            { id: "coppia", label: "In coppia", icon: "💑" },
+            { id: "famiglia", label: "Famiglia", icon: "👨‍👩‍👧‍👦" },
+            { id: "amici", label: "Amici", icon: "👯" },
+            { id: "lavoro", label: "Lavoro", icon: "💼" },
+            { id: "altro", label: "Altro", icon: "👥" },
+          ].map((option) => (
+            <button
+              key={option.id}
+              onClick={() => updateFormData("travelCompanions", option.id)}
+              className={`p-4 rounded-xl text-center transition ${
+                formData.travelCompanions === option.id
+                  ? "bg-orange-500 text-white"
+                  : "bg-white/5 hover:bg-white/10"
+              }`}
+            >
+              <span className="text-2xl block mb-1">{option.icon}</span>
+              <span className="text-sm">{option.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+          
           {/* Step 3: Budget */}
           {currentStep === 3 && (
             <div className="animate-fade-in">
