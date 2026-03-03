@@ -1,20 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { supabaseBrowser } from "../lib/supabase-browser";
 
 // -----------------------------------------------------
-// STEP DEFINITIONS
+// TYPE DEFINITIONS (Fix TS errors)
+// -----------------------------------------------------
+type FormDataType = {
+  destination: string;
+  departureCity: string;
+  startDate: string;
+  endDate: string;
+  numTravelers: number;
+  travelCompanions: string;
+  budgetTotal: string;
+  budgetLevel: string;
+  travelStyle: string[];
+  interests: string[];
+  experiences: string[];
+  pace: string;
+  specialRequests: string;
+
+  // Index signature (THIS FIXES THE ERROR)
+  [key: string]: any;
+};
+
+// -----------------------------------------------------
+// STEPS
 // -----------------------------------------------------
 const STEPS = [
   { id: 1, title: "Destinazione", icon: "🌍" },
   { id: 2, title: "Partenza & Date", icon: "✈️" },
   { id: 3, title: "Budget", icon: "💰" },
-  { id: 4, title: "Stile di Viaggio", icon: "✨" },
-  { id: 5, title: "Cosa Vuoi Fare", icon: "🎡" },
+  { id: 4, title: "Stile", icon: "✨" },
+  { id: 5, title: "Cosa vuoi fare", icon: "🎡" },
   { id: 6, title: "Riepilogo", icon: "📋" }
 ];
 
@@ -22,9 +44,9 @@ export default function OnboardingPage() {
   const router = useRouter();
 
   // -----------------------------------------------------
-  // FORM DATA — COMPLETE
+  // FORM DATA (with type)
   // -----------------------------------------------------
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormDataType>({
     destination: "",
     departureCity: "",
     startDate: "",
@@ -33,9 +55,9 @@ export default function OnboardingPage() {
     travelCompanions: "",
     budgetTotal: "",
     budgetLevel: "",
-    travelStyle: [] as string[],
-    interests: [] as string[],
-    experiences: [] as string[],
+    travelStyle: [],
+    interests: [],
+    experiences: [],
     pace: "",
     specialRequests: "",
   });
@@ -44,14 +66,15 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
 
   // -----------------------------------------------------
-  // FORM UTILS
+  // HELPERS
   // -----------------------------------------------------
   const updateFormData = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const toggleArrayItem = (field: string, item: string) => {
+  const toggleArrayItem = (field: keyof FormDataType, item: string) => {
     const array = formData[field] as string[];
+
     if (array.includes(item)) {
       updateFormData(field, array.filter((i) => i !== item));
     } else {
@@ -59,22 +82,31 @@ export default function OnboardingPage() {
     }
   };
 
+  const canProceed = () => {
+    if (currentStep === 1) return formData.destination.length > 1;
+    if (currentStep === 2) return formData.departureCity.length > 1;
+    if (currentStep === 3) return formData.budgetTotal.length > 0;
+    if (currentStep === 4) return formData.travelStyle.length > 0;
+    if (currentStep === 5) return formData.experiences.length > 0;
+    return true;
+  };
+
   // -----------------------------------------------------
-  // SUBMIT LOGIC
+  // SUBMIT
   // -----------------------------------------------------
   const handleSubmit = async () => {
     setLoading(true);
 
     try {
       const { data: { user } } = await supabaseBrowser.auth.getUser();
+
       if (!user) {
         localStorage.setItem("pendingTrip", JSON.stringify(formData));
         router.push("/register");
         return;
       }
 
-      // SAVE TRIP
-      const { data: trip, error: tripError } = await supabaseBrowser
+      const { data: trip } = await supabaseBrowser
         .from("trip_requests")
         .insert({
           user_id: user.id,
@@ -90,9 +122,6 @@ export default function OnboardingPage() {
         .select()
         .single();
 
-      if (tripError) throw tripError;
-
-      // SAVE PREFERENCES
       await supabaseBrowser.from("travel_preferences").upsert({
         user_id: user.id,
         travel_style: formData.travelStyle,
@@ -106,156 +135,103 @@ export default function OnboardingPage() {
 
     } catch (err) {
       console.error(err);
-      alert("Errore. Riprova.");
+      alert("Errore.");
     }
 
     setLoading(false);
   };
 
   // -----------------------------------------------------
-  // CAN PROCEED VALIDATION
-  // -----------------------------------------------------
-  const canProceed = () => {
-    if (currentStep === 1) return formData.destination.length > 1;
-    if (currentStep === 2) return formData.departureCity.length > 1;
-    if (currentStep === 3) return formData.budgetTotal.length > 0 || formData.budgetLevel.length > 0;
-    if (currentStep === 4) return formData.travelStyle.length > 0;
-    if (currentStep === 5) return formData.experiences.length > 0;
-    return true;
-  };
-
-  // -----------------------------------------------------
-  // RENDER PAGE
+  // UI
   // -----------------------------------------------------
   return (
     <div className="min-h-screen hero-bg">
-      {/* -----------------------------------------------------
-         NAVBAR WITH PROGRESS 
-      ----------------------------------------------------- */}
-      <header className="fixed top-0 left-0 right-0 z-50 px-6 py-4 bg-slate-900/80 backdrop-blur-lg border-b border-white/5">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link href="/">
-            <Image src="/Logo.png" alt="ROAMIQ" width={120} height={35} />
-          </Link>
 
-          <div className="hidden md:flex items-center gap-2">
-            {STEPS.map((step, index) => (
-              <div key={step.id} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    currentStep >= step.id ? "bg-orange-500 text-white" : "bg-white/10 text-gray-400"
-                  }`}
-                >
-                  {currentStep > step.id ? "✓" : step.id}
-                </div>
-                {index < STEPS.length - 1 && (
-                  <div className={`w-8 h-0.5 ${currentStep > step.id ? "bg-orange-500" : "bg-white/10"}`} />
-                )}
-              </div>
-            ))}
-          </div>
-
-          <Link href="/" className="text-gray-400 hover:text-white">✕</Link>
+      {/* TOP NAV / PROGRESS */}
+      <header className="fixed top-0 left-0 right-0 px-6 py-4 bg-slate-900/80 backdrop-blur-lg z-50">
+        <div className="max-w-4xl mx-auto flex justify-between items-center">
+          <Link href="/"><Image src="/Logo.png" alt="logo" width={120} height={40} /></Link>
+          <span className="text-gray-400">{currentStep}/6</span>
+          <Link href="/" className="text-gray-400">✕</Link>
         </div>
       </header>
 
       <main className="pt-24 pb-32 px-6">
         <div className="max-w-2xl mx-auto">
 
-          {/* -----------------------------------------------------
-             STEP 1 — DESTINAZIONE
-          ----------------------------------------------------- */}
+          {/* STEP 1 */}
           {currentStep === 1 && (
             <div className="text-center animate-fade-in">
-              <span className="text-6xl mb-4 block">🌍</span>
-              <h1 className="text-3xl font-bold mb-3">Dove vuoi andare?</h1>
+              <span className="text-7xl block mb-6">🌍</span>
+              <h1 className="text-3xl font-bold">Dove vuoi andare?</h1>
+
               <input
                 type="text"
+                placeholder="Parigi, Tokyo, New York..."
+                className="input-field w-full mt-8 text-center text-xl py-5"
                 value={formData.destination}
                 onChange={(e) => updateFormData("destination", e.target.value)}
-                className="input-field text-xl py-5 text-center mt-6"
-                placeholder="Parigi, Tokyo, Barcellona..."
               />
             </div>
           )}
 
-          {/* -----------------------------------------------------
-             STEP 2 — PARTENZA & DATE
-          ----------------------------------------------------- */}
+          {/* STEP 2 */}
           {currentStep === 2 && (
             <div className="animate-fade-in">
               <div className="text-center mb-10">
-                <span className="text-6xl block mb-4">✈️</span>
-                <h1 className="text-3xl font-bold mb-3">Da dove parti?</h1>
+                <span className="text-7xl block mb-6">✈️</span>
+                <h1 className="text-3xl font-bold">Da dove parti?</h1>
               </div>
 
-              <div className="space-y-6">
+              <input
+                type="text"
+                placeholder="Milano, Roma Fiumicino..."
+                className="input-field w-full"
+                value={formData.departureCity}
+                onChange={(e) => updateFormData("departureCity", e.target.value)}
+              />
+
+              <div className="grid grid-cols-2 gap-4 mt-6">
                 <input
-                  type="text"
-                  placeholder="Milano, Roma Fiumicino, Venezia..."
-                  value={formData.departureCity}
-                  onChange={(e) => updateFormData("departureCity", e.target.value)}
+                  type="date"
                   className="input-field"
+                  value={formData.startDate}
+                  onChange={(e) => updateFormData("startDate", e.target.value)}
                 />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-gray-300 text-sm mb-2 block">Data partenza</label>
-                    <input
-                      type="date"
-                      className="input-field"
-                      value={formData.startDate}
-                      onChange={(e) => updateFormData("startDate", e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-gray-300 text-sm mb-2 block">Data ritorno</label>
-                    <input
-                      type="date"
-                      className="input-field"
-                      value={formData.endDate}
-                      onChange={(e) => updateFormData("endDate", e.target.value)}
-                    />
-                  </div>
-                </div>
+                <input
+                  type="date"
+                  className="input-field"
+                  value={formData.endDate}
+                  onChange={(e) => updateFormData("endDate", e.target.value)}
+                />
               </div>
             </div>
           )}
 
-          {/* -----------------------------------------------------
-             STEP 3 — BUDGET
-          ----------------------------------------------------- */}
+          {/* STEP 3 */}
           {currentStep === 3 && (
             <div className="text-center animate-fade-in">
-              <span className="text-6xl block mb-4">💰</span>
-              <h1 className="text-3xl font-bold mb-3">Qual è il tuo budget?</h1>
+              <span className="text-7xl block mb-6">💰</span>
+              <h1 className="text-3xl font-bold">Budget totale?</h1>
 
               <input
                 type="number"
+                className="input-field w-full mt-6 text-center"
                 placeholder="es. 1500"
-                className="input-field mt-6 text-center"
                 value={formData.budgetTotal}
                 onChange={(e) => updateFormData("budgetTotal", e.target.value)}
               />
             </div>
           )}
 
-          {/* -----------------------------------------------------
-             STEP 4 — STILE DI VIAGGIO
-          ----------------------------------------------------- */}
+          {/* STEP 4 */}
           {currentStep === 4 && (
-            <div className="animate-fade-in">
-              <div className="text-center mb-10">
-                <span className="text-6xl block mb-4">✨</span>
-                <h1 className="text-3xl font-bold mb-3">Che tipo di viaggio vuoi?</h1>
-              </div>
+            <div className="animate-fade-in text-center">
+              <span className="text-7xl block mb-6">✨</span>
+              <h1 className="text-3xl font-bold">Che viaggio vuoi?</h1>
 
-              <div className="flex flex-wrap gap-3 justify-center">
-                {[
-                  "avventura", "relax", "cultura",
-                  "food", "romantico", "nightlife"
-                ].map((s) => (
+              <div className="flex flex-wrap gap-3 justify-center mt-6">
+                {["avventura", "relax", "cultura", "food", "romantico", "nightlife"].map((s) => (
                   <button
                     key={s}
                     onClick={() => toggleArrayItem("travelStyle", s)}
@@ -272,23 +248,16 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* -----------------------------------------------------
-             STEP 5 — ESPERIENZE IN CITTÀ
-          ----------------------------------------------------- */}
+          {/* STEP 5 */}
           {currentStep === 5 && (
-            <div className="animate-fade-in">
-              <div className="text-center mb-10">
-                <span className="text-6xl block mb-4">🎡</span>
-                <h1 className="text-3xl font-bold mb-3">
-                  Cosa vuoi fare nella città?
-                </h1>
-              </div>
+            <div className="animate-fade-in text-center">
+              <span className="text-7xl block mb-6">🎡</span>
+              <h1 className="text-3xl font-bold">Cosa vuoi fare?</h1>
 
-              <div className="flex flex-wrap gap-3 justify-center">
+              <div className="flex flex-wrap gap-3 justify-center mt-6">
                 {[
-                  "musei", "attrazioni", "tour guidati", "food & wine",
-                  "ristoranti locali", "shopping", "nightlife",
-                  "natura", "wellness", "eventi"
+                  "musei", "attrazioni", "tour guidati", "ristoranti",
+                  "shopping", "nightlife", "natura", "wellness"
                 ].map((exp) => (
                   <button
                     key={exp}
@@ -306,22 +275,16 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* -----------------------------------------------------
-             STEP 6 — RIEPILOGO
-          ----------------------------------------------------- */}
+          {/* STEP 6 — SUMMARY */}
           {currentStep === 6 && (
             <div className="animate-fade-in">
-              <div className="text-center mb-10">
-                <span className="text-6xl block mb-4">📋</span>
-                <h1 className="text-3xl font-bold mb-4">Riepilogo</h1>
-              </div>
+              <h1 className="text-3xl font-bold text-center mb-6">Riepilogo</h1>
 
-              <div className="glass-card text-left space-y-3">
+              <div className="glass-card space-y-3 text-white">
                 <p><strong>Destinazione:</strong> {formData.destination}</p>
                 <p><strong>Partenza da:</strong> {formData.departureCity}</p>
                 <p><strong>Date:</strong> {formData.startDate} → {formData.endDate}</p>
-                <p><strong>Viaggiatori:</strong> {formData.numTravelers}</p>
-                <p><strong>Budget:</strong> €{formData.budgetTotal || formData.budgetLevel}</p>
+                <p><strong>Budget:</strong> €{formData.budgetTotal}</p>
                 <p><strong>Stile:</strong> {formData.travelStyle.join(", ")}</p>
                 <p><strong>Esperienze:</strong> {formData.experiences.join(", ")}</p>
               </div>
@@ -329,30 +292,34 @@ export default function OnboardingPage() {
               <button
                 onClick={handleSubmit}
                 disabled={loading}
-                className="btn-primary w-full mt-6"
+                className="btn-primary w-full mt-6 py-4"
               >
-                {loading ? "Generazione in corso..." : "Genera Itinerario AI"}
+                {loading ? "Generazione..." : "Genera Itinerario AI"}
               </button>
             </div>
           )}
+
         </div>
       </main>
 
-      {/* -----------------------------------------------------
-         FOOTER NAVIGATION
-      ----------------------------------------------------- */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-lg px-6 py-4 border-t border-white/10">
-        <div className="max-w-2xl mx-auto flex justify-between items-center">
-          <button
-            onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-            className={currentStep === 1 ? "invisible" : "text-gray-300"}
-          >
-            ← Indietro
-          </button>
+      {/* FOOTER BUTTONS */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-slate-900/90 backdrop-blur-lg border-t border-white/10 px-6 py-4">
+        <div className="max-w-2xl mx-auto flex justify-between">
 
-          <span className="text-gray-400 text-sm">{currentStep} / 6</span>
+          {/* Indietro */}
+          {currentStep > 1 ? (
+            <button
+              className="text-gray-300"
+              onClick={() => setCurrentStep(currentStep - 1)}
+            >
+              ← Indietro
+            </button>
+          ) : (
+            <div></div>
+          )}
 
-          {currentStep < 6 ? (
+          {/* Avanti */}
+          {currentStep < 6 && (
             <button
               disabled={!canProceed()}
               onClick={() => setCurrentStep(currentStep + 1)}
@@ -362,9 +329,9 @@ export default function OnboardingPage() {
             >
               Avanti →
             </button>
-          ) : (
-            <div></div>
           )}
+
+          {currentStep === 6 && <div></div>}
         </div>
       </footer>
     </div>
