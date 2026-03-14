@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { supabaseBrowser } from "../../../lib/supabase-browser"; // ✅ percorso corretto
+import { supabaseBrowser } from "../../lib/supabase-browser";
 
 export default function TripPage() {
   const { id } = useParams();
