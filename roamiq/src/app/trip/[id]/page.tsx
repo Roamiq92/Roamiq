@@ -1,25 +1,17 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";                       // <– CSS necessario
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { supabaseBrowser } from "../../lib/supabase-browser";  // percorso corretto
-import dynamic from "next/dynamic";
-
-// Lazy import di Leaflet (per evitare errori SSR)
-const MapContainer = dynamic(() => import("react-leaflet").then(m => m.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import("react-leaflet").then(m => m.TileLayer), { ssr: false });
-const Marker = dynamic(() => import("react-leaflet").then(m => m.Marker), { ssr: false });
-const Popup = dynamic(() => import("react-leaflet").then(m => m.Popup), { ssr: false });
+import { supabaseBrowser } from "../../lib/supabase-browser";
 
 export default function TripPage() {
   const { id } = useParams();
   const [trip, setTrip] = useState<any>(null);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [coords, setCoords] = useState<[number, number] | null>(null);
+  const [mapUrl, setMapUrl] = useState<string | null>(null);
 
-  // 1. Caricamento dati viaggio
+  // 1. Carica i dati del viaggio
   useEffect(() => {
     const loadTrip = async () => {
       const { data } = await supabaseBrowser.from("trip_requests").select("*").eq("id", id).single();
@@ -28,7 +20,7 @@ export default function TripPage() {
     loadTrip();
   }, [id]);
 
-  // 2. Generazione tramite AI + geocoding città
+  // 2. Genera itinerario + mappa statica
   useEffect(() => {
     const generate = async () => {
       if (!trip) return;
@@ -41,15 +33,14 @@ export default function TripPage() {
       setData(result);
       setLoading(false);
 
-      // otteniamo coordinate dal nome città
-      const g = await fetch(`[nominatim.openstreetmap.org](https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trip.destination)})`);
-      const geo = await g.json();
-      if (geo[0]) setCoords([parseFloat(geo[0].lat), parseFloat(geo[0].lon)]);
+      // immagine statica da OpenStreetMap (fallback)
+      const encoded = encodeURIComponent(trip.destination);
+      setMapUrl(`[source.unsplash.com](https://source.unsplash.com/1000x400/?${encoded},city)`);
     };
     generate();
   }, [trip]);
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-black via-[#0b0d13] to-[#111317] text-white">
         <div className="animate-spin w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full mb-6" />
@@ -60,98 +51,57 @@ export default function TripPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0b0f] text-white flex flex-col items-center">
-      {/* Hero */}
       <section className="text-center py-12 px-4 max-w-4xl">
         <h1 className="text-5xl font-bold mb-4">{trip.destination}</h1>
-        {data.overview && <p className="text-gray-400 text-lg">{data.overview}</p>}
+        <p className="text-gray-400 text-lg">{data.overview}</p>
       </section>
 
-      {/* Mappa */}
-      {coords && (
-        <div className="w-full max-w-4xl h-72 rounded-2xl overflow-hidden mb-10">
-          <MapContainer center={coords} zoom={12} style={{ width: "100%", height: "100%" }}>
-            <TileLayer url="[{s}.tile.openstreetmap.org](https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png)"
-              attribution="© OpenStreetMap" />
-            <Marker position={coords}>
-              <Popup>{trip.destination}</Popup>
-            </Marker>
-          </MapContainer>
+      {mapUrl && (
+        <div className="w-full max-w-4xl mb-10 rounded-2xl overflow-hidden shadow-2xl">
+          <img src={mapUrl} alt="Mappa della città" className="object-cover w-full h-80 opacity-90" />
         </div>
       )}
 
       <div className="w-full max-w-5xl px-6">
-        {data.flights && (
-          <DashboardSection title="✈️ Voli">
-            {data.flights.map((f: any, i: number) => (
-              <BookingCard key={i} title={`${f.airline} ${f.from} → ${f.to}`} subtitle={`€${f.price}`} link={f.link} />
-            ))}
-          </DashboardSection>
-        )}
-        {data.hotels && (
-          <DashboardSection title="🏨 Hotel">
-            {data.hotels.map((h: any, i: number) => (
-              <BookingCard key={i} title={h.name} subtitle={`${h.rating}★ €${h.price_per_night}/notte`} link={h.link} />
-            ))}
-          </DashboardSection>
-        )}
-        {data.activities && (
-          <DashboardSection title="🎟️ Attività">
-            {data.activities.map((a: any, i: number) => (
-              <BookingCard key={i} title={a.name} subtitle={a.category || ""} link={a.link} />
-            ))}
-          </DashboardSection>
-        )}
-        {data.restaurants && (
-          <DashboardSection title="🍽️ Ristoranti">
-            {data.restaurants.map((r: any, i: number) => (
-              <BookingCard key={i} title={r.name} subtitle={r.type} link={r.link} />
-            ))}
-          </DashboardSection>
-        )}
+        <DashboardSection title="✈️ Voli" list={data.flights} type="flight" />
+        <DashboardSection title="🏨 Hotel" list={data.hotels} type="hotel" />
+        <DashboardSection title="🍽️ Ristoranti / Attività" list={[...(data.restaurants ?? []), ...(data.activities ?? [])]} />
       </div>
 
-      {/* Totale & Bottone Premium */}
       <footer className="py-10 text-center">
         <p className="text-gray-400 mb-2">
           Costo stimato totale 
           <span className="text-orange-400 font-semibold">€{data.estimated_cost}</span>
         </p>
         <button className="px-10 py-4 rounded-full text-black bg-orange-500 hover:bg-orange-400 font-semibold">
-          Attiva ROAMIQ Premium
+          Attiva ROAMIQ Premium
         </button>
       </footer>
     </div>
   );
 }
 
-function DashboardSection({ title, children }: { title: string; children: React.ReactNode }) {
+function DashboardSection({ title, list, type }: { title: string; list?: any[]; type?: string }) {
+  if (!list || list.length === 0) return null;
   return (
     <section className="mb-10">
       <h2 className="text-2xl font-bold mb-4 border-b border-white/10 pb-2">{title}</h2>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">{children}</div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {list.map((item, i) => (
+          <a
+            key={i}
+            href={item.link}
+            target="_blank"
+            rel="noreferrer"
+            className="p-4 border border-white/10 bg-white/5 hover:bg-white/10 rounded-xl transition block group"
+          >
+            <p className="font-semibold group-hover:text-orange-400 transition">
+              {item.name || item.airline}
+            </p>
+            {item.price && <p className="text-gray-400 text-sm">€{item.price}</p>}
+          </a>
+        ))}
+      </div>
     </section>
-  );
-}
-
-function BookingCard({
-  title,
-  subtitle,
-  link
-}: {
-  title: string;
-  subtitle?: string;
-  link: string;
-}) {
-  return (
-    <a
-      href={link}
-      target="_blank"
-      rel="noreferrer"
-      className="p-4 border border-white/10 bg-white/5 hover:bg-white/10 rounded-xl transition block group"
-    >
-      <p className="font-semibold group-hover:text-orange-400 transition">{title}</p>
-      {subtitle && <p className="text-gray-400 text-sm">{subtitle}</p>}
-      <div className="mt-2 text-sm text-orange-500 font-medium">Prenota →</div>
-    </a>
   );
 }
