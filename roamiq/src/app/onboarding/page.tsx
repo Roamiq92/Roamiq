@@ -1,400 +1,510 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import { supabaseBrowser } from "../lib/supabase-browser";
 
-// ----------------------
-// Types
-// ----------------------
-type ArrayFields = "travelStyle" | "experiences";
-
-type FormDataType = {
+/* ─── TYPES ─────────────────────────────────────────────── */
+type TripData = {
   destination: string;
-  departureCity: string;
   startDate: string;
   endDate: string;
-  numTravelers: number;
-  travelCompanions: string;
-  budgetTotal: string;
-  travelStyle: string[];
-  experiences: string[];
-  pace: string;
-  specialRequests: string;
+  travelers: "solo" | "coppia" | "amici" | "famiglia" | "";
+  budget: "low" | "mid" | "high" | "luxury" | "";
+  interests: string[];
+  pace: "lento" | "equilibrato" | "intenso" | "";
 };
 
-// ----------------------
-// Steps
-// ----------------------
-const STEPS = [
-  { id: 1, label: "Destinazione" },
-  { id: 2, label: "Partenza" },
-  { id: 3, label: "Budget" },
-  { id: 4, label: "Stile" },
-  { id: 5, label: "Esperienze" },
-  { id: 6, label: "Riepilogo" }
+const INITIAL: TripData = {
+  destination: "",
+  startDate: "",
+  endDate: "",
+  travelers: "",
+  budget: "",
+  interests: [],
+  pace: "",
+};
+
+const INTERESTS = [
+  { id: "arte",       label: "Arte & Musei",       icon: "🎨" },
+  { id: "food",       label: "Food & Vino",         icon: "🍷" },
+  { id: "natura",     label: "Natura & Trekking",   icon: "🌿" },
+  { id: "storia",     label: "Storia & Cultura",    icon: "🏛️" },
+  { id: "nightlife",  label: "Nightlife",            icon: "🎶" },
+  { id: "shopping",   label: "Shopping",             icon: "🛍️" },
+  { id: "sport",      label: "Sport & Avventura",   icon: "⚡" },
+  { id: "relax",      label: "Relax & Spa",          icon: "🧘" },
+  { id: "foto",       label: "Fotografia",           icon: "📸" },
 ];
 
-// ----------------------
-// Dynamic Background Loader
-// ----------------------
-async function fetchCityBackground(city: string) {
-  try {
-    const url = `https://source.unsplash.com/1600x900/?${encodeURIComponent(city)},city,landscape`;
-    return url;
-  } catch {
-    return "/fallback.jpg";
-  }
+const TOTAL_STEPS = 6;
+
+/* ─── HELPERS ───────────────────────────────────────────── */
+function ProgressBar({ step }: { step: number }) {
+  return (
+    <div className="ob-progress">
+      {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+        <div
+          key={i}
+          className={`ob-progress-dot ${
+            i + 1 < step ? "done" : i + 1 === step ? "active" : ""
+          }`}
+        />
+      ))}
+    </div>
+  );
 }
 
-export default function OnboardingPage() {
-  const router = useRouter();
+function Card({ children }: { children: React.ReactNode }) {
+  return <div className="ob-card">{children}</div>;
+}
 
-  // ----------------------
-  // States
-  // ----------------------
-  const [bgImage, setBgImage] = useState("/fallback.jpg");
-
-  const [formData, setFormData] = useState<FormDataType>({
-    destination: "",
-    departureCity: "",
-    startDate: "",
-    endDate: "",
-    numTravelers: 2,
-    travelCompanions: "",
-    budgetTotal: "",
-    travelStyle: [],
-    experiences: [],
-    pace: "",
-    specialRequests: ""
-  });
-
-  const [currentStep, setCurrentStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-
-  // ----------------------
-  // Load background on destination change
-  // ----------------------
-  useEffect(() => {
-    if (formData.destination.length > 1) {
-      fetchCityBackground(formData.destination).then((img) => {
-        setBgImage(img);
-      });
-    }
-  }, [formData.destination]);
-
-  // ----------------------
-  // Update form field
-  // ----------------------
-  const updateFormData = (field: keyof FormDataType, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  // ----------------------
-  // Toggle array items
-  // ----------------------
-  const toggleArrayItem = (field: ArrayFields, value: string) => {
-    const arr = formData[field];
-    if (arr.includes(value)) {
-      updateFormData(field, arr.filter((v) => v !== value));
-    } else {
-      updateFormData(field, [...arr, value]);
-    }
-  };
-
-  // ----------------------
-  // Validation
-  // ----------------------
-  const canProceed = () => {
-    if (currentStep === 1) return formData.destination.length > 1;
-    if (currentStep === 2) return formData.departureCity.length > 1;
-    if (currentStep === 3) return formData.budgetTotal.length > 0;
-    if (currentStep === 4) return formData.travelStyle.length > 0;
-    if (currentStep === 5) return formData.experiences.length > 0;
-    return true;
-  };
-
-  // ----------------------
-  // Submit handler
-  // ----------------------
-  const handleSubmit = async () => {
-    setLoading(true);
-
-    const { data: { user } } = await supabaseBrowser.auth.getUser();
-
-    if (!user) {
-      localStorage.setItem("pendingTrip", JSON.stringify(formData));
-      router.push("/register");
-      return;
-    }
-
-    const { data: trip } = await supabaseBrowser
-      .from("trip_requests")
-      .insert({
-        user_id: user.id,
-        destination: formData.destination,
-        start_date: formData.startDate,
-        end_date: formData.endDate,
-        num_travelers: formData.numTravelers,
-        budget_total: formData.budgetTotal,
-        travel_companions: formData.travelCompanions,
-        special_requests: formData.specialRequests,
-        departure_city: formData.departureCity
-      })
-      .select()
-      .single();
-
-    await supabaseBrowser.from("travel_preferences").upsert({
-      user_id: user.id,
-      travel_style: formData.travelStyle,
-      experiences: formData.experiences,
-      pace: formData.pace
-    });
-
-    router.push(`/trip/${trip.id}`);
-  };
-
-  // ----------------------
-  // UI
-  // ----------------------
+function StepLabel({ step }: { step: number }) {
   return (
-    <div className="relative min-h-screen w-full overflow-hidden text-white">
+    <div className="ob-step-label">
+      Step {step} di {TOTAL_STEPS}
+    </div>
+  );
+}
 
-      {/* Dynamic blurred background */}
-      <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: `url(${bgImage})`,
-          filter: "blur(38px) brightness(0.38)"
-        }}
+function NavButtons({
+  step,
+  onBack,
+  onNext,
+  canNext,
+  loading,
+  lastStep,
+}: {
+  step: number;
+  onBack: () => void;
+  onNext: () => void;
+  canNext: boolean;
+  loading?: boolean;
+  lastStep?: boolean;
+}) {
+  return (
+    <div className="ob-nav">
+      {step > 1 && (
+        <button className="ob-btn-back" onClick={onBack}>
+          ← Indietro
+        </button>
+      )}
+      <button
+        className={`ob-btn-next ${!canNext ? "disabled" : ""} ${lastStep ? "cta" : ""}`}
+        onClick={onNext}
+        disabled={!canNext || loading}
+      >
+        {loading ? (
+          <span className="ob-spinner" />
+        ) : lastStep ? (
+          "✨ Genera il mio itinerario"
+        ) : (
+          "Avanti →"
+        )}
+      </button>
+    </div>
+  );
+}
+
+/* ─── STEP COMPONENTS ────────────────────────────────────── */
+
+function Step1({
+  data,
+  onChange,
+}: {
+  data: TripData;
+  onChange: (v: Partial<TripData>) => void;
+}) {
+  const popular = ["Roma", "Barcellona", "Parigi", "Lisbona", "Amsterdam", "Vienna", "Praga", "Berlino"];
+  return (
+    <Card>
+      <div className="ob-icon">🌍</div>
+      <h2 className="ob-title">Dove vuoi andare?</h2>
+      <p className="ob-sub">Scrivi una città o scegli tra quelle più popolari.</p>
+      <input
+        className="ob-input"
+        type="text"
+        placeholder="Es. Barcellona, Tokyo, New York..."
+        value={data.destination}
+        onChange={(e) => onChange({ destination: e.target.value })}
+        autoFocus
       />
+      <div className="ob-chips">
+        {popular.map((city) => (
+          <button
+            key={city}
+            className={`ob-chip ${data.destination === city ? "selected" : ""}`}
+            onClick={() => onChange({ destination: city })}
+          >
+            {city}
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
-      {/* Titanium Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/65 to-black/85" />
-
-      {/* CONTENT */}
-      <div className="relative z-20 flex flex-col items-center min-h-screen pt-28 pb-20">
-
-        {/* PROGRESS BAR */}
-        <div className="flex items-center justify-center gap-3 mb-10">
-          {STEPS.map((step, idx) => (
-            <div key={step.id} className="flex items-center">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition ${
-                  currentStep === step.id
-                    ? "bg-white text-black"
-                    : currentStep > step.id
-                    ? "bg-orange-500 text-black"
-                    : "bg-white/30 text-white"
-                }`}
-              >
-                {step.id}
-              </div>
-              {idx < STEPS.length - 1 && (
-                <div className="w-10 h-[2px] bg-white/20 mx-2" />
-              )}
-            </div>
-          ))}
+function Step2({
+  data,
+  onChange,
+}: {
+  data: TripData;
+  onChange: (v: Partial<TripData>) => void;
+}) {
+  return (
+    <Card>
+      <div className="ob-icon">📅</div>
+      <h2 className="ob-title">Quando vuoi partire?</h2>
+      <p className="ob-sub">Seleziona le date del tuo viaggio.</p>
+      <div className="ob-date-grid">
+        <div className="ob-date-field">
+          <label className="ob-label">Data di partenza</label>
+          <input
+            className="ob-input"
+            type="date"
+            value={data.startDate}
+            min={new Date().toISOString().split("T")[0]}
+            onChange={(e) => onChange({ startDate: e.target.value })}
+          />
         </div>
+        <div className="ob-date-field">
+          <label className="ob-label">Data di ritorno</label>
+          <input
+            className="ob-input"
+            type="date"
+            value={data.endDate}
+            min={data.startDate || new Date().toISOString().split("T")[0]}
+            onChange={(e) => onChange({ endDate: e.target.value })}
+          />
+        </div>
+      </div>
+      {data.startDate && data.endDate && (
+        <div className="ob-duration-badge">
+          ✈️{" "}
+          {Math.ceil(
+            (new Date(data.endDate).getTime() -
+              new Date(data.startDate).getTime()) /
+              86400000
+          )}{" "}
+          giorni di viaggio
+        </div>
+      )}
+    </Card>
+  );
+}
 
-        {/* CARD */}
-        <div className="w-full max-w-lg px-6">
-          <div className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl p-8 flex flex-col items-center">
+function Step3({
+  data,
+  onChange,
+}: {
+  data: TripData;
+  onChange: (v: Partial<TripData>) => void;
+}) {
+  const options = [
+    { id: "solo",     label: "Solo",     icon: "🧍", desc: "Il mio ritmo, le mie regole" },
+    { id: "coppia",   label: "Coppia",   icon: "👫", desc: "Romantico e su misura" },
+    { id: "amici",    label: "Amici",    icon: "👯", desc: "Divertimento e scoperta" },
+    { id: "famiglia", label: "Famiglia", icon: "👨‍👩‍👧‍👦", desc: "Per grandi e piccoli" },
+  ] as const;
+  return (
+    <Card>
+      <div className="ob-icon">👥</div>
+      <h2 className="ob-title">Con chi viaggi?</h2>
+      <p className="ob-sub">L&apos;AI adatta l&apos;itinerario al tuo gruppo.</p>
+      <div className="ob-options-grid">
+        {options.map((opt) => (
+          <button
+            key={opt.id}
+            className={`ob-option-card ${data.travelers === opt.id ? "selected" : ""}`}
+            onClick={() => onChange({ travelers: opt.id })}
+          >
+            <span className="ob-option-icon">{opt.icon}</span>
+            <span className="ob-option-label">{opt.label}</span>
+            <span className="ob-option-desc">{opt.desc}</span>
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
-            {/* STEP 1 */}
-            {currentStep === 1 && (
-              <>
-                <div className="text-7xl mb-5">🌍</div>
-                <h1 className="text-3xl font-bold mb-6 text-center">
-                  Dove vuoi andare?
-                </h1>
+function Step4({
+  data,
+  onChange,
+}: {
+  data: TripData;
+  onChange: (v: Partial<TripData>) => void;
+}) {
+  const options = [
+    { id: "low",    label: "Economico",  icon: "💚", range: "< €80/giorno",     desc: "Ostelli, street food, gratis" },
+    { id: "mid",    label: "Medio",      icon: "💛", range: "€80–200/giorno",   desc: "Hotel 3★, ristoranti locali" },
+    { id: "high",   label: "Comfort",    icon: "🧡", range: "€200–400/giorno",  desc: "Hotel 4★, esperienze premium" },
+    { id: "luxury", label: "Lusso",      icon: "💜", range: "> €400/giorno",    desc: "Suite, private tour, fine dining" },
+  ] as const;
+  return (
+    <Card>
+      <div className="ob-icon">💰</div>
+      <h2 className="ob-title">Qual è il tuo budget?</h2>
+      <p className="ob-sub">Ti costruiamo un viaggio nei tuoi parametri reali.</p>
+      <div className="ob-budget-grid">
+        {options.map((opt) => (
+          <button
+            key={opt.id}
+            className={`ob-budget-card ${data.budget === opt.id ? "selected" : ""}`}
+            onClick={() => onChange({ budget: opt.id })}
+          >
+            <span className="ob-budget-icon">{opt.icon}</span>
+            <span className="ob-budget-label">{opt.label}</span>
+            <span className="ob-budget-range">{opt.range}</span>
+            <span className="ob-budget-desc">{opt.desc}</span>
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
-                <input
-                  type="text"
-                  className="input-field text-center text-lg py-4 w-full bg-white/10 border border-white/20 rounded-xl"
-                  placeholder="Parigi, Tokyo, New York..."
-                  value={formData.destination}
-                  onChange={(e) => updateFormData("destination", e.target.value)}
-                />
-              </>
-            )}
+function Step5({
+  data,
+  onChange,
+}: {
+  data: TripData;
+  onChange: (v: Partial<TripData>) => void;
+}) {
+  const toggle = (id: string) => {
+    const current = data.interests;
+    const next = current.includes(id)
+      ? current.filter((i) => i !== id)
+      : [...current, id];
+    onChange({ interests: next });
+  };
+  return (
+    <Card>
+      <div className="ob-icon">✨</div>
+      <h2 className="ob-title">Cosa ami fare?</h2>
+      <p className="ob-sub">Scegli almeno 2 interessi. Più scegli, meglio ti conosco.</p>
+      <div className="ob-interests-grid">
+        {INTERESTS.map((int) => (
+          <button
+            key={int.id}
+            className={`ob-interest-btn ${data.interests.includes(int.id) ? "selected" : ""}`}
+            onClick={() => toggle(int.id)}
+          >
+            <span>{int.icon}</span>
+            <span>{int.label}</span>
+          </button>
+        ))}
+      </div>
+      {data.interests.length > 0 && (
+        <p className="ob-counter">{data.interests.length} selezionati</p>
+      )}
+    </Card>
+  );
+}
 
-            {/* STEP 2 */}
-            {currentStep === 2 && (
-              <>
-                <div className="text-7xl mb-5">✈️</div>
-                <h1 className="text-3xl font-bold mb-6 text-center">
-                  Da dove parti?
-                </h1>
+function Step6({
+  data,
+  onChange,
+}: {
+  data: TripData;
+  onChange: (v: Partial<TripData>) => void;
+}) {
+  const options = [
+    {
+      id: "lento",
+      label: "Rilassato",
+      icon: "🌅",
+      desc: "2–3 attività al giorno. Tanto tempo libero, soste lunghe e pasti calmi.",
+    },
+    {
+      id: "equilibrato",
+      label: "Equilibrato",
+      icon: "⚖️",
+      desc: "3–5 attività al giorno. Il giusto mix tra esplorazione e relax.",
+    },
+    {
+      id: "intenso",
+      label: "Intenso",
+      icon: "🚀",
+      desc: "5+ attività al giorno. Ogni minuto sfruttato, massima scoperta.",
+    },
+  ] as const;
 
-                <input
-                  type="text"
-                  className="input-field text-center py-4 mb-5 w-full bg-white/10 border border-white/20 rounded-xl"
-                  placeholder="Milano, Roma Fiumicino..."
-                  value={formData.departureCity}
-                  onChange={(e) =>
-                    updateFormData("departureCity", e.target.value)
-                  }
-                />
+  const days =
+    data.startDate && data.endDate
+      ? Math.ceil(
+          (new Date(data.endDate).getTime() -
+            new Date(data.startDate).getTime()) /
+            86400000
+        )
+      : null;
 
-                <div className="grid grid-cols-2 gap-4 w-full">
-                  <input
-                    type="date"
-                    className="input-field bg-white/10 border border-white/20 rounded-xl py-3 px-4"
-                    value={formData.startDate}
-                    onChange={(e) =>
-                      updateFormData("startDate", e.target.value)
-                    }
-                  />
-                  <input
-                    type="date"
-                    className="input-field bg-white/10 border border-white/20 rounded-xl py-3 px-4"
-                    value={formData.endDate}
-                    onChange={(e) => updateFormData("endDate", e.target.value)}
-                  />
-                </div>
-              </>
-            )}
+  return (
+    <Card>
+      <div className="ob-icon">⚡</div>
+      <h2 className="ob-title">Che ritmo preferisci?</h2>
+      <p className="ob-sub">L&apos;AI calibra la densità dell&apos;itinerario sul tuo stile.</p>
+      <div className="ob-pace-grid">
+        {options.map((opt) => (
+          <button
+            key={opt.id}
+            className={`ob-pace-card ${data.pace === opt.id ? "selected" : ""}`}
+            onClick={() => onChange({ pace: opt.id })}
+          >
+            <span className="ob-pace-icon">{opt.icon}</span>
+            <span className="ob-pace-label">{opt.label}</span>
+            <p className="ob-pace-desc">{opt.desc}</p>
+          </button>
+        ))}
+      </div>
 
-            {/* STEP 3 */}
-            {currentStep === 3 && (
-              <>
-                <div className="text-7xl mb-5">💰</div>
-                <h1 className="text-3xl font-bold mb-6 text-center">
-                  Budget totale?
-                </h1>
-
-                <input
-                  type="number"
-                  className="input-field text-center py-4 w-full bg-white/10 border border-white/20 rounded-xl"
-                  placeholder="1500"
-                  value={formData.budgetTotal}
-                  onChange={(e) =>
-                    updateFormData("budgetTotal", e.target.value)
-                  }
-                />
-              </>
-            )}
-
-            {/* STEP 4 */}
-            {currentStep === 4 && (
-              <>
-                <div className="text-7xl mb-5">✨</div>
-                <h1 className="text-3xl font-bold mb-6 text-center">
-                  Che stile vuoi?
-                </h1>
-
-                <div className="flex flex-wrap justify-center gap-3">
-                  {["avventura", "relax", "cultura", "food", "romantico", "nightlife"].map(
-                    (s) => (
-                      <button
-                        key={s}
-                        onClick={() => toggleArrayItem("travelStyle", s)}
-                        className={`px-4 py-2 rounded-full transition ${
-                          formData.travelStyle.includes(s)
-                            ? "bg-orange-500 text-black"
-                            : "bg-white/10 text-white"
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    )
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* STEP 5 */}
-            {currentStep === 5 && (
-              <>
-                <div className="text-7xl mb-5">🎡</div>
-                <h1 className="text-3xl font-bold mb-6 text-center">
-                  Cosa vuoi fare?
-                </h1>
-
-                <div className="flex flex-wrap justify-center gap-3">
-                  {[
-                    "musei",
-                    "attrazioni",
-                    "tour guidati",
-                    "ristoranti",
-                    "shopping",
-                    "nightlife",
-                    "natura",
-                    "wellness"
-                  ].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => toggleArrayItem("experiences", s)}
-                      className={`px-4 py-2 rounded-full transition ${
-                        formData.experiences.includes(s)
-                          ? "bg-orange-500 text-black"
-                          : "bg-white/10 text-white"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {/* STEP 6 */}
-            {currentStep === 6 && (
-              <>
-                <div className="text-7xl mb-5">📋</div>
-                <h1 className="text-3xl font-bold mb-6 text-center">
-                  Riepilogo
-                </h1>
-
-                <div className="space-y-2 text-lg text-white/90">
-                  <p><b>Destinazione:</b> {formData.destination}</p>
-                  <p><b>Partenza da:</b> {formData.departureCity}</p>
-                  <p><b>Date:</b> {formData.startDate} → {formData.endDate}</p>
-                  <p><b>Budget:</b> €{formData.budgetTotal}</p>
-                  <p><b>Stile:</b> {formData.travelStyle.join(", ")}</p>
-                  <p><b>Esperienze:</b> {formData.experiences.join(", ")}</p>
-                </div>
-
-                <button
-                  onClick={handleSubmit}
-                  className="w-full py-4 text-lg bg-orange-500 text-black rounded-xl mt-8 hover:bg-orange-400 transition"
-                  disabled={loading}
-                >
-                  {loading ? "Generazione..." : "Genera Itinerario AI"}
-                </button>
-              </>
-            )}
-
+      {/* Riepilogo */}
+      <div className="ob-summary">
+        <div className="ob-summary-title">Il tuo riepilogo</div>
+        <div className="ob-summary-grid">
+          <div className="ob-summary-item">
+            <span className="ob-summary-icon">📍</span>
+            <span>{data.destination}</span>
+          </div>
+          <div className="ob-summary-item">
+            <span className="ob-summary-icon">📅</span>
+            <span>{days ? `${days} giorni` : "—"}</span>
+          </div>
+          <div className="ob-summary-item">
+            <span className="ob-summary-icon">👥</span>
+            <span className="capitalize">{data.travelers || "—"}</span>
+          </div>
+          <div className="ob-summary-item">
+            <span className="ob-summary-icon">💰</span>
+            <span className="capitalize">{data.budget || "—"}</span>
           </div>
         </div>
+      </div>
+    </Card>
+  );
+}
 
-        {/* FOOTER BUTTONS */}
-        <div className="flex justify-between w-full max-w-lg px-6 mt-6">
-          <button
-            onClick={() => currentStep > 1 && setCurrentStep(currentStep - 1)}
-            className={`text-white/80 text-lg ${currentStep === 1 ? "invisible" : ""}`}
+/* ─── LOADING SCREEN ─────────────────────────────────────── */
+function GeneratingScreen({ destination }: { destination: string }) {
+  const steps = [
+    "Analisi delle tue preferenze...",
+    "Ricerca delle migliori esperienze a " + destination + "...",
+    "Ottimizzazione dell'itinerario...",
+    "Calcolo dei costi e disponibilità...",
+    "Finalizzazione del tuo viaggio su misura...",
+  ];
+  const [current] = useState(0);
+
+  return (
+    <div className="ob-generating">
+      <div className="ob-gen-logo">ROAM<span>IQ</span></div>
+      <div className="ob-gen-spinner">
+        <div className="ob-gen-ring" />
+        <div className="ob-gen-emoji">✨</div>
+      </div>
+      <h2 className="ob-gen-title">Sto creando il tuo viaggio perfetto</h2>
+      <p className="ob-gen-sub">L&apos;AI sta lavorando per te...</p>
+      <div className="ob-gen-steps">
+        {steps.map((s, i) => (
+          <div
+            key={i}
+            className={`ob-gen-step ${i <= current ? "active" : ""}`}
           >
-            ← Indietro
-          </button>
+            <span className="ob-gen-check">{i <= current ? "✓" : "○"}</span>
+            {s}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
-          {currentStep < 6 && (
-            <button
-              disabled={!canProceed()}
-              onClick={() => setCurrentStep(currentStep + 1)}
-              className={`px-6 py-2 text-lg rounded-full ${
-                canProceed()
-                  ? "bg-orange-500 text-black hover:bg-orange-400"
-                  : "bg-white/10 text-white/40"
-              }`}
-            >
-              Avanti →
-            </button>
-          )}
+/* ─── MAIN PAGE ──────────────────────────────────────────── */
+export default function OnboardingPage() {
+  const router = useRouter();
+  const [step, setStep] = useState(1);
+  const [data, setData] = useState<TripData>(INITIAL);
+  const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const update = (v: Partial<TripData>) => setData((d) => ({ ...d, ...v }));
+
+  const canNext = (): boolean => {
+    switch (step) {
+      case 1: return data.destination.trim().length >= 2;
+      case 2: return !!data.startDate && !!data.endDate && data.endDate > data.startDate;
+      case 3: return !!data.travelers;
+      case 4: return !!data.budget;
+      case 5: return data.interests.length >= 2;
+      case 6: return !!data.pace;
+      default: return false;
+    }
+  };
+
+  const handleNext = async () => {
+    if (step < TOTAL_STEPS) {
+      setStep((s) => s + 1);
+      return;
+    }
+    // Step 6 → generate
+    setGenerating(true);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/generate-itinerary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("API error");
+      const json = await res.json();
+      // Redirect to trip page; pass id returned by API
+      const tripId = json.tripId ?? json.id ?? "demo";
+      router.push(`/trip/${tripId}`);
+    } catch (err) {
+      console.error(err);
+      setGenerating(false);
+      setLoading(false);
+      alert("Qualcosa è andato storto. Riprova tra poco.");
+    }
+  };
+
+  if (generating) {
+    return <GeneratingScreen destination={data.destination} />;
+  }
+
+  return (
+    <div className="ob-page">
+      {/* Header */}
+      <header className="ob-header">
+        <Link href="/" className="ob-logo">
+          ROAM<span>IQ</span>
+        </Link>
+        <ProgressBar step={step} />
+        <div className="ob-step-counter">{step}/{TOTAL_STEPS}</div>
+      </header>
+
+      {/* Step label */}
+      <div className="ob-container">
+        <StepLabel step={step} />
+
+        {/* Steps */}
+        <div className="ob-step-wrap">
+          {step === 1 && <Step1 data={data} onChange={update} />}
+          {step === 2 && <Step2 data={data} onChange={update} />}
+          {step === 3 && <Step3 data={data} onChange={update} />}
+          {step === 4 && <Step4 data={data} onChange={update} />}
+          {step === 5 && <Step5 data={data} onChange={update} />}
+          {step === 6 && <Step6 data={data} onChange={update} />}
         </div>
 
+        <NavButtons
+          step={step}
+          onBack={() => setStep((s) => s - 1)}
+          onNext={handleNext}
+          canNext={canNext()}
+          loading={loading}
+          lastStep={step === TOTAL_STEPS}
+        />
       </div>
     </div>
   );
