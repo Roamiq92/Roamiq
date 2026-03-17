@@ -1,107 +1,167 @@
-"use client";
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { supabaseBrowser } from "../../lib/supabase-browser";
-
-export default function TripPage() {
-  const { id } = useParams();
-  const [trip, setTrip] = useState<any>(null);
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [mapUrl, setMapUrl] = useState<string | null>(null);
-
-  // 1. Carica i dati del viaggio
-  useEffect(() => {
-    const loadTrip = async () => {
-      const { data } = await supabaseBrowser.from("trip_requests").select("*").eq("id", id).single();
-      if (data) setTrip(data);
-    };
-    loadTrip();
-  }, [id]);
-
-  // 2. Genera itinerario + mappa statica
-  useEffect(() => {
-    const generate = async () => {
-      if (!trip) return;
-      const res = await fetch("/api/generate-itinerary", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(trip)
-      });
-      const result = await res.json();
-      setData(result);
-      setLoading(false);
-
-      // immagine statica da OpenStreetMap (fallback)
-      const encoded = encodeURIComponent(trip.destination);
-      setMapUrl(`[source.unsplash.com](https://source.unsplash.com/1000x400/?${encoded},city)`);
-    };
-    generate();
-  }, [trip]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-black via-[#0b0d13] to-[#111317] text-white">
-        <div className="animate-spin w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full mb-6" />
-        <h1 className="text-2xl font-semibold">Generazione itinerario...</h1>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#0a0b0f] text-white flex flex-col items-center">
-      <section className="text-center py-12 px-4 max-w-4xl">
-        <h1 className="text-5xl font-bold mb-4">{trip.destination}</h1>
-        <p className="text-gray-400 text-lg">{data.overview}</p>
-      </section>
-
-      {mapUrl && (
-        <div className="w-full max-w-4xl mb-10 rounded-2xl overflow-hidden shadow-2xl">
-          <img src={mapUrl} alt="Mappa della città" className="object-cover w-full h-80 opacity-90" />
-        </div>
-      )}
-
-      <div className="w-full max-w-5xl px-6">
-        <DashboardSection title="✈️ Voli" list={data.flights} type="flight" />
-        <DashboardSection title="🏨 Hotel" list={data.hotels} type="hotel" />
-        <DashboardSection title="🍽️ Ristoranti / Attività" list={[...(data.restaurants ?? []), ...(data.activities ?? [])]} />
-      </div>
-
-      <footer className="py-10 text-center">
-        <p className="text-gray-400 mb-2">
-          Costo stimato totale 
-          <span className="text-orange-400 font-semibold">€{data.estimated_cost}</span>
-        </p>
-        <button className="px-10 py-4 rounded-full text-black bg-orange-500 hover:bg-orange-400 font-semibold">
-          Attiva ROAMIQ Premium
-        </button>
-      </footer>
-    </div>
-  );
+/* ── Types ─────────────────────────────────────────────────── */
+interface OnboardingData {
+  destination: string;
+  startDate: string;
+  endDate: string;
+  travelers: "solo" | "coppia" | "amici" | "famiglia";
+  budget: "low" | "mid" | "high" | "luxury";
+  interests: string[];
+  pace: "lento" | "equilibrato" | "intenso";
 }
 
-function DashboardSection({ title, list, type }: { title: string; list?: any[]; type?: string }) {
-  if (!list || list.length === 0) return null;
-  return (
-    <section className="mb-10">
-      <h2 className="text-2xl font-bold mb-4 border-b border-white/10 pb-2">{title}</h2>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {list.map((item, i) => (
-          <a
-            key={i}
-            href={item.link}
-            target="_blank"
-            rel="noreferrer"
-            className="p-4 border border-white/10 bg-white/5 hover:bg-white/10 rounded-xl transition block group"
-          >
-            <p className="font-semibold group-hover:text-orange-400 transition">
-              {item.name || item.airline}
-            </p>
-            {item.price && <p className="text-gray-400 text-sm">€{item.price}</p>}
-          </a>
-        ))}
-      </div>
-    </section>
+const BUDGET_MAP = {
+  low:    "economico (meno di €80/giorno a persona)",
+  mid:    "medio (€80–200/giorno a persona)",
+  high:   "comfort (€200–400/giorno a persona)",
+  luxury: "lusso (oltre €400/giorno a persona)",
+};
+
+const PACE_MAP = {
+  lento:       "rilassato (2–3 attività al giorno, molto tempo libero)",
+  equilibrato: "equilibrato (3–5 attività al giorno)",
+  intenso:     "intenso (5+ attività al giorno, ogni momento sfruttato)",
+};
+
+/* ── Prompt builder ─────────────────────────────────────────── */
+function buildPrompt(data: OnboardingData): string {
+  const days = Math.ceil(
+    (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / 86400000
   );
+
+  return `Sei ROAMIQ, un AI travel planner esperto. Genera un itinerario di viaggio dettagliato in formato JSON.
+
+DATI VIAGGIO:
+- Destinazione: ${data.destination}
+- Durata: ${days} giorni (${data.startDate} → ${data.endDate})
+- Viaggiatori: ${data.travelers}
+- Budget: ${BUDGET_MAP[data.budget]}
+- Ritmo: ${PACE_MAP[data.pace]}
+- Interessi: ${data.interests.join(", ")}
+
+Rispondi SOLO con un oggetto JSON valido, nessun testo prima o dopo. Struttura esatta:
+
+{
+  "destination": "${data.destination}",
+  "country": "nome paese",
+  "emoji": "emoji bandiera paese",
+  "summary": "frase evocativa di 1 riga che descrive questo viaggio specifico",
+  "totalCostMin": numero (costo minimo totale p.p. in euro),
+  "totalCostMax": numero (costo massimo totale p.p. in euro),
+  "days": [
+    {
+      "day": 1,
+      "date": "${data.startDate}",
+      "theme": "titolo breve del giorno es. Arrivo & Gaudí",
+      "activities": [
+        {
+          "time": "09:00",
+          "name": "nome attività",
+          "description": "descrizione coinvolgente di 1-2 frasi con contesto storico/culturale",
+          "duration": "2h",
+          "priceMin": 0,
+          "priceMax": 30,
+          "category": "cultura|food|natura|nightlife|shopping|sport|relax|trasporto|alloggio",
+          "tip": "consiglio pratico insider di 1 frase",
+          "bookingRequired": true
+        }
+      ]
+    }
+  ],
+  "hotels": [
+    {
+      "name": "nome hotel",
+      "stars": 3,
+      "zone": "quartiere",
+      "pricePerNight": 80,
+      "why": "perché questo hotel per questo profilo viaggiatore"
+    }
+  ],
+  "localTips": [
+    "consiglio locale autentico 1",
+    "consiglio locale autentico 2",
+    "consiglio locale autentico 3"
+  ],
+  "bestFor": "chi viaggia ${data.travelers} con interessi in ${data.interests.slice(0,2).join(" e ")}"
+}
+
+Genera ${days} giorni completi. Ogni giorno deve avere almeno ${data.pace === "lento" ? 3 : data.pace === "equilibrato" ? 5 : 7} attività inclusi pasti e trasporti. Prezzi realistici in euro. Usa la lingua italiana.`;
+}
+
+/* ── Route handler ──────────────────────────────────────────── */
+export async function POST(req: NextRequest) {
+  try {
+    const body: OnboardingData = await req.json();
+
+    // Validate input
+    if (!body.destination || !body.startDate || !body.endDate) {
+      return NextResponse.json({ error: "Dati mancanti" }, { status: 400 });
+    }
+
+    // Call Claude API
+    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-opus-4-5",
+        max_tokens: 8192,
+        messages: [{ role: "user", content: buildPrompt(body) }],
+      }),
+    });
+
+    if (!claudeRes.ok) {
+      const err = await claudeRes.text();
+      console.error("Claude API error:", err);
+      return NextResponse.json({ error: "Errore AI" }, { status: 500 });
+    }
+
+    const claudeData = await claudeRes.json();
+    const rawText = claudeData.content[0]?.text ?? "";
+
+    // Parse JSON from Claude response
+    let itinerary;
+    try {
+      // Strip possible markdown fences
+      const clean = rawText.replace(/```json|```/g, "").trim();
+      itinerary = JSON.parse(clean);
+    } catch {
+      console.error("JSON parse failed:", rawText.slice(0, 200));
+      return NextResponse.json({ error: "Errore parsing itinerario" }, { status: 500 });
+    }
+
+    // Save to Supabase
+    const supabase = createClient();
+    const { data: trip, error: dbError } = await supabase
+      .from("trips")
+      .insert({
+        destination: body.destination,
+        start_date: body.startDate,
+        end_date: body.endDate,
+        travelers: body.travelers,
+        budget: body.budget,
+        interests: body.interests,
+        pace: body.pace,
+        itinerary,
+        status: "generated",
+      })
+      .select("id")
+      .single();
+
+    if (dbError) {
+      console.error("Supabase error:", dbError);
+      // Return itinerary anyway without saving (graceful fallback)
+      return NextResponse.json({ tripId: "demo", itinerary });
+    }
+
+    return NextResponse.json({ tripId: trip.id, itinerary });
+  } catch (error) {
+    console.error("Generate itinerary error:", error);
+    return NextResponse.json({ error: "Errore interno" }, { status: 500 });
+  }
 }
