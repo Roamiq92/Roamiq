@@ -2,65 +2,130 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase-browser";
 
-export default function Dashboard() {
-  const router = useRouter();
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+interface Trip {
+  id: string;
+  destination: string;
+  start_date: string;
+  end_date: string;
+  travelers: string;
+  budget: string;
+  itinerary: { emoji: string; summary: string; totalCostMin: number; totalCostMax: number };
+  created_at: string;
+}
 
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getUser();
-
-      if (!data.user) {
-        router.push("/login");
-      } else {
-        setUser(data.user);
-      }
-
-      setLoading(false);
-    };
-
-    checkUser();
-  }, []);
-
-  if (loading) {
-    return <div style={{ padding: 40 }}>Loading...</div>;
-  }
-
-  if (!user) {
-    return null;
-  }
+function TripCard({ trip }: { trip: Trip }) {
+  const days = Math.ceil(
+    (new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime()) / 86400000
+  );
+  const fmt = (d: string) =>
+    new Date(d).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
 
   return (
-    <div style={{ padding: 40 }}>
-      <h1 style={{ fontSize: 32, marginBottom: 20 }}>
-        Dashboard
-      </h1>
+    <Link href={`/trip/${trip.id}`} className="dash-trip-card">
+      <div className="dash-trip-emoji">{trip.itinerary?.emoji ?? "🌍"}</div>
+      <div className="dash-trip-body">
+        <div className="dash-trip-dest">{trip.destination}</div>
+        <div className="dash-trip-meta">
+          {fmt(trip.start_date)} → {fmt(trip.end_date)} · {days} giorni · {trip.travelers}
+        </div>
+        {trip.itinerary?.summary && (
+          <div className="dash-trip-summary">{trip.itinerary.summary}</div>
+        )}
+      </div>
+      <div className="dash-trip-right">
+        <div className="dash-trip-cost">
+          €{trip.itinerary?.totalCostMin ?? "—"}–{trip.itinerary?.totalCostMax ?? "—"}
+        </div>
+        <div className="dash-trip-cost-label">p.p.</div>
+        <div className="dash-trip-arrow">→</div>
+      </div>
+    </Link>
+  );
+}
 
-      <p style={{ color: "#64748b", marginBottom: 30 }}>
-        Benvenuto {user.email}
-      </p>
+export default function DashboardPage() {
+  const router = useRouter();
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState("");
 
-      <button
-        onClick={async () => {
-          await supabase.auth.signOut();
-          router.push("/");
-        }}
-        style={{
-          padding: "12px 20px",
-          borderRadius: 10,
-          border: "none",
-          background:
-            "linear-gradient(to right, #6366f1, #8b5cf6)",
-          color: "white",
-          fontWeight: 600,
-          cursor: "pointer",
-        }}
-      >
-        Logout
-      </button>
+  useEffect(() => {
+    async function load() {
+      const supabase = createBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      setUserName(user.user_metadata?.full_name?.split(" ")[0] ?? "Viaggiatore");
+
+      const { data } = await supabase
+        .from("trips")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      setTrips((data as Trip[]) ?? []);
+      setLoading(false);
+    }
+    load();
+  }, [router]);
+
+  const handleLogout = async () => {
+    const supabase = createBrowserClient();
+    await supabase.auth.signOut();
+    router.push("/");
+  };
+
+  return (
+    <div className="dash-page">
+      {/* NAV */}
+      <nav className="trip-nav">
+        <Link href="/" className="ob-logo">ROAM<span>IQ</span></Link>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "1rem" }}>
+          <span className="dash-greeting">Ciao, {userName} 👋</span>
+          <Link href="/onboarding" className="nav-cta">+ Nuovo viaggio</Link>
+          <button className="trip-btn-ghost" onClick={handleLogout}>Esci</button>
+        </div>
+      </nav>
+
+      <main className="dash-main">
+        {/* Header */}
+        <div className="dash-header">
+          <div>
+            <h1 className="dash-title">I tuoi viaggi</h1>
+            <p className="dash-sub">Tutti gli itinerari AI che hai generato.</p>
+          </div>
+          <Link href="/onboarding" className="btn-primary" style={{ textDecoration: "none" }}>
+            🚀 Pianifica nuovo viaggio
+          </Link>
+        </div>
+
+        {/* Content */}
+        {loading ? (
+          <div className="dash-loading">
+            <span className="ob-spinner" style={{ borderTopColor: "var(--blue)", borderColor: "var(--border)", width: 32, height: 32 }} />
+          </div>
+        ) : trips.length === 0 ? (
+          <div className="dash-empty">
+            <div className="dash-empty-icon">🗺️</div>
+            <h2 className="dash-empty-title">Nessun viaggio ancora</h2>
+            <p className="dash-empty-sub">Pianifica il tuo primo itinerario AI in 30 secondi.</p>
+            <Link href="/onboarding" className="btn-primary" style={{ textDecoration: "none", display: "inline-block", marginTop: "1.2rem" }}>
+              Inizia ora →
+            </Link>
+          </div>
+        ) : (
+          <div className="dash-trips-list">
+            {trips.map((t) => <TripCard key={t.id} trip={t} />)}
+          </div>
+        )}
+      </main>
     </div>
   );
 }
