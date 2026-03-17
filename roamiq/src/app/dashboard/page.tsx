@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../lib/supabase";
+import { createBrowserClient } from "@/lib/supabase-browser";
 
 export default function Dashboard() {
   const router = useRouter();
