@@ -1,28 +1,35 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Syne, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ 
+const syne = Syne({
   subsets: ["latin"],
-  display: 'swap',
+  weight: ["400", "600", "700", "800"],
+  variable: "--font-syne",
+  display: "swap",
+});
+
+const jakartaSans = Plus_Jakarta_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-jakarta",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "ROAMIQ - Il Tuo Viaggio, Intelligente",
-  description: "L'AI-Powered Travel Operating System. Pianifica viaggi personalizzati in pochi minuti.",
-  keywords: "viaggi, AI, itinerari, travel planner, intelligenza artificiale",
+  title: "ROAMIQ – Il Tuo Viaggio, Intelligente",
+  description:
+    "ROAMIQ utilizza l'intelligenza artificiale per pianificare, ottimizzare e farti vivere esperienze uniche in ogni città.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="it" className="scroll-smooth">
-      <body className={inter.className}>
-        {children}
-      </body>
+    <html lang="it" className={`${syne.variable} ${jakartaSans.variable}`}>
+      <body>{children}</body>
     </html>
   );
 }
