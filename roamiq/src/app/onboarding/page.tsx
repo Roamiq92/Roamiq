@@ -7,6 +7,7 @@ import Link from "next/link";
 /* ─── TYPES ─────────────────────────────────────────────── */
 type TripData = {
   destination: string;
+  departureCity: string;
   startDate: string;
   endDate: string;
   travelers: "solo" | "coppia" | "amici" | "famiglia" | "";
@@ -17,6 +18,7 @@ type TripData = {
 
 const INITIAL: TripData = {
   destination: "",
+  departureCity: "",
   startDate: "",
   endDate: "",
   travelers: "",
@@ -26,15 +28,15 @@ const INITIAL: TripData = {
 };
 
 const INTERESTS = [
-  { id: "arte",       label: "Arte & Musei",       icon: "🎨" },
-  { id: "food",       label: "Food & Vino",         icon: "🍷" },
-  { id: "natura",     label: "Natura & Trekking",   icon: "🌿" },
-  { id: "storia",     label: "Storia & Cultura",    icon: "🏛️" },
-  { id: "nightlife",  label: "Nightlife",            icon: "🎶" },
-  { id: "shopping",   label: "Shopping",             icon: "🛍️" },
-  { id: "sport",      label: "Sport & Avventura",   icon: "⚡" },
-  { id: "relax",      label: "Relax & Spa",          icon: "🧘" },
-  { id: "foto",       label: "Fotografia",           icon: "📸" },
+  { id: "arte",      label: "Arte & Musei",      icon: "🎨" },
+  { id: "food",      label: "Food & Vino",        icon: "🍷" },
+  { id: "natura",    label: "Natura & Trekking",  icon: "🌿" },
+  { id: "storia",    label: "Storia & Cultura",   icon: "🏛️" },
+  { id: "nightlife", label: "Nightlife",           icon: "🎶" },
+  { id: "shopping",  label: "Shopping",            icon: "🛍️" },
+  { id: "sport",     label: "Sport & Avventura",  icon: "⚡" },
+  { id: "relax",     label: "Relax & Spa",         icon: "🧘" },
+  { id: "foto",      label: "Fotografia",          icon: "📸" },
 ];
 
 const TOTAL_STEPS = 6;
@@ -151,11 +153,28 @@ function Step2({
   data: TripData;
   onChange: (v: Partial<TripData>) => void;
 }) {
+  const days =
+    data.startDate && data.endDate
+      ? Math.ceil(
+          (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / 86400000
+        )
+      : null;
+
   return (
     <Card>
       <div className="ob-icon">📅</div>
-      <h2 className="ob-title">Quando vuoi partire?</h2>
-      <p className="ob-sub">Seleziona le date del tuo viaggio.</p>
+      <h2 className="ob-title">Quando e da dove?</h2>
+      <p className="ob-sub">Città di partenza e date del viaggio.</p>
+
+      <label className="ob-label">Città di partenza</label>
+      <input
+        className="ob-input"
+        type="text"
+        placeholder="Es. Milano, Roma, Torino..."
+        value={data.departureCity}
+        onChange={(e) => onChange({ departureCity: e.target.value })}
+      />
+
       <div className="ob-date-grid">
         <div className="ob-date-field">
           <label className="ob-label">Data di partenza</label>
@@ -178,15 +197,10 @@ function Step2({
           />
         </div>
       </div>
-      {data.startDate && data.endDate && (
+
+      {days && days > 0 && (
         <div className="ob-duration-badge">
-          ✈️{" "}
-          {Math.ceil(
-            (new Date(data.endDate).getTime() -
-              new Date(data.startDate).getTime()) /
-              86400000
-          )}{" "}
-          giorni di viaggio
+          ✈️ {days} giorni di viaggio · {data.departureCity} → {data.destination}
         </div>
       )}
     </Card>
@@ -236,10 +250,10 @@ function Step4({
   onChange: (v: Partial<TripData>) => void;
 }) {
   const options = [
-    { id: "low",    label: "Economico",  icon: "💚", range: "< €80/giorno",     desc: "Ostelli, street food, gratis" },
-    { id: "mid",    label: "Medio",      icon: "💛", range: "€80–200/giorno",   desc: "Hotel 3★, ristoranti locali" },
-    { id: "high",   label: "Comfort",    icon: "🧡", range: "€200–400/giorno",  desc: "Hotel 4★, esperienze premium" },
-    { id: "luxury", label: "Lusso",      icon: "💜", range: "> €400/giorno",    desc: "Suite, private tour, fine dining" },
+    { id: "low",    label: "Economico", icon: "💚", range: "< €80/giorno",    desc: "Ostelli, street food, gratis" },
+    { id: "mid",    label: "Medio",     icon: "💛", range: "€80–200/giorno",  desc: "Hotel 3★, ristoranti locali" },
+    { id: "high",   label: "Comfort",   icon: "🧡", range: "€200–400/giorno", desc: "Hotel 4★, esperienze premium" },
+    { id: "luxury", label: "Lusso",     icon: "💜", range: "> €400/giorno",   desc: "Suite, private tour, fine dining" },
   ] as const;
   return (
     <Card>
@@ -272,10 +286,9 @@ function Step5({
   onChange: (v: Partial<TripData>) => void;
 }) {
   const toggle = (id: string) => {
-    const current = data.interests;
-    const next = current.includes(id)
-      ? current.filter((i) => i !== id)
-      : [...current, id];
+    const next = data.interests.includes(id)
+      ? data.interests.filter((i) => i !== id)
+      : [...data.interests, id];
     onChange({ interests: next });
   };
   return (
@@ -310,32 +323,15 @@ function Step6({
   onChange: (v: Partial<TripData>) => void;
 }) {
   const options = [
-    {
-      id: "lento",
-      label: "Rilassato",
-      icon: "🌅",
-      desc: "2–3 attività al giorno. Tanto tempo libero, soste lunghe e pasti calmi.",
-    },
-    {
-      id: "equilibrato",
-      label: "Equilibrato",
-      icon: "⚖️",
-      desc: "3–5 attività al giorno. Il giusto mix tra esplorazione e relax.",
-    },
-    {
-      id: "intenso",
-      label: "Intenso",
-      icon: "🚀",
-      desc: "5+ attività al giorno. Ogni minuto sfruttato, massima scoperta.",
-    },
+    { id: "lento",       label: "Rilassato",   icon: "🌅", desc: "2–3 attività al giorno. Tanto tempo libero, soste lunghe e pasti calmi." },
+    { id: "equilibrato", label: "Equilibrato",  icon: "⚖️", desc: "3–5 attività al giorno. Il giusto mix tra esplorazione e relax." },
+    { id: "intenso",     label: "Intenso",      icon: "🚀", desc: "5+ attività al giorno. Ogni minuto sfruttato, massima scoperta." },
   ] as const;
 
   const days =
     data.startDate && data.endDate
       ? Math.ceil(
-          (new Date(data.endDate).getTime() -
-            new Date(data.startDate).getTime()) /
-            86400000
+          (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / 86400000
         )
       : null;
 
@@ -358,13 +354,16 @@ function Step6({
         ))}
       </div>
 
-      {/* Riepilogo */}
       <div className="ob-summary">
         <div className="ob-summary-title">Il tuo riepilogo</div>
         <div className="ob-summary-grid">
           <div className="ob-summary-item">
+            <span className="ob-summary-icon">🛫</span>
+            <span>{data.departureCity || "—"}</span>
+          </div>
+          <div className="ob-summary-item">
             <span className="ob-summary-icon">📍</span>
-            <span>{data.destination}</span>
+            <span>{data.destination || "—"}</span>
           </div>
           <div className="ob-summary-item">
             <span className="ob-summary-icon">📅</span>
@@ -378,13 +377,17 @@ function Step6({
             <span className="ob-summary-icon">💰</span>
             <span className="capitalize">{data.budget || "—"}</span>
           </div>
+          <div className="ob-summary-item">
+            <span className="ob-summary-icon">🎯</span>
+            <span>{data.interests.length} interessi</span>
+          </div>
         </div>
       </div>
     </Card>
   );
 }
 
-/* ─── LOADING SCREEN ─────────────────────────────────────── */
+/* ─── GENERATING SCREEN ──────────────────────────────────── */
 function GeneratingScreen({ destination }: { destination: string }) {
   const steps = [
     "Analisi delle tue preferenze...",
@@ -406,10 +409,7 @@ function GeneratingScreen({ destination }: { destination: string }) {
       <p className="ob-gen-sub">L&apos;AI sta lavorando per te...</p>
       <div className="ob-gen-steps">
         {steps.map((s, i) => (
-          <div
-            key={i}
-            className={`ob-gen-step ${i <= current ? "active" : ""}`}
-          >
+          <div key={i} className={`ob-gen-step ${i <= current ? "active" : ""}`}>
             <span className="ob-gen-check">{i <= current ? "✓" : "○"}</span>
             {s}
           </div>
@@ -432,7 +432,7 @@ export default function OnboardingPage() {
   const canNext = (): boolean => {
     switch (step) {
       case 1: return data.destination.trim().length >= 2;
-      case 2: return !!data.startDate && !!data.endDate && data.endDate > data.startDate;
+      case 2: return !!data.departureCity.trim() && !!data.startDate && !!data.endDate && data.endDate > data.startDate;
       case 3: return !!data.travelers;
       case 4: return !!data.budget;
       case 5: return data.interests.length >= 2;
@@ -446,7 +446,6 @@ export default function OnboardingPage() {
       setStep((s) => s + 1);
       return;
     }
-    // Step 6 → generate
     setGenerating(true);
     setLoading(true);
     try {
@@ -457,7 +456,6 @@ export default function OnboardingPage() {
       });
       if (!res.ok) throw new Error("API error");
       const json = await res.json();
-      // Redirect to trip page; pass id returned by API
       const tripId = json.tripId ?? json.id ?? "demo";
       router.push(`/trip/${tripId}`);
     } catch (err) {
@@ -474,7 +472,6 @@ export default function OnboardingPage() {
 
   return (
     <div className="ob-page">
-      {/* Header */}
       <header className="ob-header">
         <Link href="/" className="ob-logo">
           ROAM<span>IQ</span>
@@ -483,11 +480,8 @@ export default function OnboardingPage() {
         <div className="ob-step-counter">{step}/{TOTAL_STEPS}</div>
       </header>
 
-      {/* Step label */}
       <div className="ob-container">
         <StepLabel step={step} />
-
-        {/* Steps */}
         <div className="ob-step-wrap">
           {step === 1 && <Step1 data={data} onChange={update} />}
           {step === 2 && <Step2 data={data} onChange={update} />}
@@ -496,7 +490,6 @@ export default function OnboardingPage() {
           {step === 5 && <Step5 data={data} onChange={update} />}
           {step === 6 && <Step6 data={data} onChange={update} />}
         </div>
-
         <NavButtons
           step={step}
           onBack={() => setStep((s) => s - 1)}
