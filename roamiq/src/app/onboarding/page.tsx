@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -70,53 +70,29 @@ function StepLabel({ step }: { step: number }) {
 }
 
 function NavButtons({
-  step,
-  onBack,
-  onNext,
-  canNext,
-  loading,
-  lastStep,
+  step, onBack, onNext, canNext, loading, lastStep,
 }: {
-  step: number;
-  onBack: () => void;
-  onNext: () => void;
-  canNext: boolean;
-  loading?: boolean;
-  lastStep?: boolean;
+  step: number; onBack: () => void; onNext: () => void;
+  canNext: boolean; loading?: boolean; lastStep?: boolean;
 }) {
   return (
     <div className="ob-nav">
       {step > 1 && (
-        <button className="ob-btn-back" onClick={onBack}>
-          ← Indietro
-        </button>
+        <button className="ob-btn-back" onClick={onBack}>← Indietro</button>
       )}
       <button
         className={`ob-btn-next ${!canNext ? "disabled" : ""} ${lastStep ? "cta" : ""}`}
         onClick={onNext}
         disabled={!canNext || loading}
       >
-        {loading ? (
-          <span className="ob-spinner" />
-        ) : lastStep ? (
-          "✨ Genera il mio itinerario"
-        ) : (
-          "Avanti →"
-        )}
+        {loading ? <span className="ob-spinner" /> : lastStep ? "✨ Genera il mio itinerario" : "Avanti →"}
       </button>
     </div>
   );
 }
 
-/* ─── STEP COMPONENTS ────────────────────────────────────── */
-
-function Step1({
-  data,
-  onChange,
-}: {
-  data: TripData;
-  onChange: (v: Partial<TripData>) => void;
-}) {
+/* ─── STEPS ──────────────────────────────────────────────── */
+function Step1({ data, onChange }: { data: TripData; onChange: (v: Partial<TripData>) => void }) {
   const popular = ["Roma", "Barcellona", "Parigi", "Lisbona", "Amsterdam", "Vienna", "Praga", "Berlino"];
   return (
     <Card>
@@ -124,8 +100,7 @@ function Step1({
       <h2 className="ob-title">Dove vuoi andare?</h2>
       <p className="ob-sub">Scrivi una città o scegli tra quelle più popolari.</p>
       <input
-        className="ob-input"
-        type="text"
+        className="ob-input" type="text"
         placeholder="Es. Barcellona, Tokyo, New York..."
         value={data.destination}
         onChange={(e) => onChange({ destination: e.target.value })}
@@ -137,50 +112,35 @@ function Step1({
             key={city}
             className={`ob-chip ${data.destination === city ? "selected" : ""}`}
             onClick={() => onChange({ destination: city })}
-          >
-            {city}
-          </button>
+          >{city}</button>
         ))}
       </div>
     </Card>
   );
 }
 
-function Step2({
-  data,
-  onChange,
-}: {
-  data: TripData;
-  onChange: (v: Partial<TripData>) => void;
-}) {
-  const days =
-    data.startDate && data.endDate
-      ? Math.ceil(
-          (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / 86400000
-        )
-      : null;
+function Step2({ data, onChange }: { data: TripData; onChange: (v: Partial<TripData>) => void }) {
+  const days = data.startDate && data.endDate
+    ? Math.ceil((new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / 86400000)
+    : null;
 
   return (
     <Card>
       <div className="ob-icon">📅</div>
       <h2 className="ob-title">Quando e da dove?</h2>
       <p className="ob-sub">Città di partenza e date del viaggio.</p>
-
       <label className="ob-label">Città di partenza</label>
       <input
-        className="ob-input"
-        type="text"
+        className="ob-input" type="text"
         placeholder="Es. Milano, Roma, Torino..."
         value={data.departureCity}
         onChange={(e) => onChange({ departureCity: e.target.value })}
       />
-
       <div className="ob-date-grid">
         <div className="ob-date-field">
           <label className="ob-label">Data di partenza</label>
           <input
-            className="ob-input"
-            type="date"
+            className="ob-input" type="date"
             value={data.startDate}
             min={new Date().toISOString().split("T")[0]}
             onChange={(e) => onChange({ startDate: e.target.value })}
@@ -189,31 +149,23 @@ function Step2({
         <div className="ob-date-field">
           <label className="ob-label">Data di ritorno</label>
           <input
-            className="ob-input"
-            type="date"
+            className="ob-input" type="date"
             value={data.endDate}
             min={data.startDate || new Date().toISOString().split("T")[0]}
             onChange={(e) => onChange({ endDate: e.target.value })}
           />
         </div>
       </div>
-
       {days && days > 0 && (
         <div className="ob-duration-badge">
-          ✈️ {days} giorni di viaggio · {data.departureCity} → {data.destination}
+          ✈️ {days} giorni · {data.departureCity} → {data.destination}
         </div>
       )}
     </Card>
   );
 }
 
-function Step3({
-  data,
-  onChange,
-}: {
-  data: TripData;
-  onChange: (v: Partial<TripData>) => void;
-}) {
+function Step3({ data, onChange }: { data: TripData; onChange: (v: Partial<TripData>) => void }) {
   const options = [
     { id: "solo",     label: "Solo",     icon: "🧍", desc: "Il mio ritmo, le mie regole" },
     { id: "coppia",   label: "Coppia",   icon: "👫", desc: "Romantico e su misura" },
@@ -242,13 +194,7 @@ function Step3({
   );
 }
 
-function Step4({
-  data,
-  onChange,
-}: {
-  data: TripData;
-  onChange: (v: Partial<TripData>) => void;
-}) {
+function Step4({ data, onChange }: { data: TripData; onChange: (v: Partial<TripData>) => void }) {
   const options = [
     { id: "low",    label: "Economico", icon: "💚", range: "< €80/giorno",    desc: "Ostelli, street food, gratis" },
     { id: "mid",    label: "Medio",     icon: "💛", range: "€80–200/giorno",  desc: "Hotel 3★, ristoranti locali" },
@@ -278,13 +224,7 @@ function Step4({
   );
 }
 
-function Step5({
-  data,
-  onChange,
-}: {
-  data: TripData;
-  onChange: (v: Partial<TripData>) => void;
-}) {
+function Step5({ data, onChange }: { data: TripData; onChange: (v: Partial<TripData>) => void }) {
   const toggle = (id: string) => {
     const next = data.interests.includes(id)
       ? data.interests.filter((i) => i !== id)
@@ -315,25 +255,16 @@ function Step5({
   );
 }
 
-function Step6({
-  data,
-  onChange,
-}: {
-  data: TripData;
-  onChange: (v: Partial<TripData>) => void;
-}) {
+function Step6({ data, onChange }: { data: TripData; onChange: (v: Partial<TripData>) => void }) {
   const options = [
-    { id: "lento",       label: "Rilassato",   icon: "🌅", desc: "2–3 attività al giorno. Tanto tempo libero, soste lunghe e pasti calmi." },
-    { id: "equilibrato", label: "Equilibrato",  icon: "⚖️", desc: "3–5 attività al giorno. Il giusto mix tra esplorazione e relax." },
-    { id: "intenso",     label: "Intenso",      icon: "🚀", desc: "5+ attività al giorno. Ogni minuto sfruttato, massima scoperta." },
+    { id: "lento",       label: "Rilassato",  icon: "🌅", desc: "2–3 attività al giorno. Tanto tempo libero." },
+    { id: "equilibrato", label: "Equilibrato", icon: "⚖️", desc: "3–5 attività al giorno. Mix perfetto." },
+    { id: "intenso",     label: "Intenso",     icon: "🚀", desc: "5+ attività al giorno. Ogni minuto sfruttato." },
   ] as const;
 
-  const days =
-    data.startDate && data.endDate
-      ? Math.ceil(
-          (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / 86400000
-        )
-      : null;
+  const days = data.startDate && data.endDate
+    ? Math.ceil((new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / 86400000)
+    : null;
 
   return (
     <Card>
@@ -353,34 +284,15 @@ function Step6({
           </button>
         ))}
       </div>
-
       <div className="ob-summary">
         <div className="ob-summary-title">Il tuo riepilogo</div>
         <div className="ob-summary-grid">
-          <div className="ob-summary-item">
-            <span className="ob-summary-icon">🛫</span>
-            <span>{data.departureCity || "—"}</span>
-          </div>
-          <div className="ob-summary-item">
-            <span className="ob-summary-icon">📍</span>
-            <span>{data.destination || "—"}</span>
-          </div>
-          <div className="ob-summary-item">
-            <span className="ob-summary-icon">📅</span>
-            <span>{days ? `${days} giorni` : "—"}</span>
-          </div>
-          <div className="ob-summary-item">
-            <span className="ob-summary-icon">👥</span>
-            <span className="capitalize">{data.travelers || "—"}</span>
-          </div>
-          <div className="ob-summary-item">
-            <span className="ob-summary-icon">💰</span>
-            <span className="capitalize">{data.budget || "—"}</span>
-          </div>
-          <div className="ob-summary-item">
-            <span className="ob-summary-icon">🎯</span>
-            <span>{data.interests.length} interessi</span>
-          </div>
+          <div className="ob-summary-item"><span className="ob-summary-icon">🛫</span><span>{data.departureCity || "—"}</span></div>
+          <div className="ob-summary-item"><span className="ob-summary-icon">📍</span><span>{data.destination || "—"}</span></div>
+          <div className="ob-summary-item"><span className="ob-summary-icon">📅</span><span>{days ? `${days} giorni` : "—"}</span></div>
+          <div className="ob-summary-item"><span className="ob-summary-icon">👥</span><span className="capitalize">{data.travelers || "—"}</span></div>
+          <div className="ob-summary-item"><span className="ob-summary-icon">💰</span><span className="capitalize">{data.budget || "—"}</span></div>
+          <div className="ob-summary-item"><span className="ob-summary-icon">🎯</span><span>{data.interests.length} interessi</span></div>
         </div>
       </div>
     </Card>
@@ -389,14 +301,23 @@ function Step6({
 
 /* ─── GENERATING SCREEN ──────────────────────────────────── */
 function GeneratingScreen({ destination }: { destination: string }) {
+  const [current, setCurrent] = useState(0);
+
   const steps = [
     "Analisi delle tue preferenze...",
-    "Ricerca delle migliori esperienze a " + destination + "...",
-    "Ottimizzazione dell'itinerario...",
+    `Ricerca delle migliori esperienze a ${destination}...`,
+    "Costruzione dell'itinerario giornaliero...",
     "Calcolo dei costi e disponibilità...",
     "Finalizzazione del tuo viaggio su misura...",
   ];
-  const [current] = useState(0);
+
+  // Avanza gli step ogni ~8 secondi (totale ~40s che è dentro il timeout di 60s)
+  useEffect(() => {
+    const timers = steps.map((_, i) =>
+      setTimeout(() => setCurrent(i), i * 8000)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
 
   return (
     <div className="ob-generating">
@@ -410,7 +331,7 @@ function GeneratingScreen({ destination }: { destination: string }) {
       <div className="ob-gen-steps">
         {steps.map((s, i) => (
           <div key={i} className={`ob-gen-step ${i <= current ? "active" : ""}`}>
-            <span className="ob-gen-check">{i <= current ? "✓" : "○"}</span>
+            <span className="ob-gen-check">{i < current ? "✓" : i === current ? "→" : "○"}</span>
             {s}
           </div>
         ))}
@@ -454,15 +375,20 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("API error");
+
       const json = await res.json();
-      const tripId = json.tripId ?? json.id ?? "demo";
+
+      if (!res.ok) {
+        throw new Error(json.error || "Errore API");
+      }
+
+      const tripId = json.tripId ?? "demo";
       router.push(`/trip/${tripId}`);
     } catch (err) {
       console.error(err);
       setGenerating(false);
       setLoading(false);
-      alert("Qualcosa è andato storto. Riprova tra poco.");
+      alert("Qualcosa è andato storto. Controlla la connessione e riprova.");
     }
   };
 
@@ -473,13 +399,10 @@ export default function OnboardingPage() {
   return (
     <div className="ob-page">
       <header className="ob-header">
-        <Link href="/" className="ob-logo">
-          ROAM<span>IQ</span>
-        </Link>
+        <Link href="/" className="ob-logo">ROAM<span>IQ</span></Link>
         <ProgressBar step={step} />
         <div className="ob-step-counter">{step}/{TOTAL_STEPS}</div>
       </header>
-
       <div className="ob-container">
         <StepLabel step={step} />
         <div className="ob-step-wrap">
