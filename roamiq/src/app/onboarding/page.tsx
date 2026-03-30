@@ -376,19 +376,37 @@ export default function OnboardingPage() {
         body: JSON.stringify(data),
       });
 
-      const json = await res.json();
+      // Leggi come testo (streaming inizia con uno spazio)
+      const text = await res.text();
 
-      if (!res.ok) {
-        throw new Error(json.error || "Errore API");
+      let json;
+      try {
+        json = JSON.parse(text.trim());
+      } catch {
+        throw new Error("Risposta non valida. Riprova.");
       }
 
+      if (json.error) throw new Error(json.error);
+
       const tripId = json.tripId ?? "demo";
+
+      // Salva in sessionStorage — funziona sempre, anche senza Supabase
+      sessionStorage.setItem("roamiq_last_trip", JSON.stringify({
+        id: tripId,
+        itinerary: json.itinerary,
+        destination: data.destination,
+        start_date: data.startDate,
+        end_date: data.endDate,
+        travelers: data.travelers,
+        budget: data.budget,
+      }));
+
       router.push(`/trip/${tripId}`);
     } catch (err) {
       console.error(err);
       setGenerating(false);
       setLoading(false);
-      alert("Qualcosa è andato storto. Controlla la connessione e riprova.");
+      alert("Errore: " + (err instanceof Error ? err.message : "Riprova tra poco"));
     }
   };
 
