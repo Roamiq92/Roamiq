@@ -676,3 +676,72 @@ body {
   .ob-budget-grid { grid-template-columns: 1fr 1fr; }
   .ob-summary-grid { grid-template-columns: 1fr; }
 }
+/* ══════════════════════════════════════════════════
+   AGGIUNGI IN FONDO A globals.css
+   ══════════════════════════════════════════════════ */
+
+/* Restaurant cards */
+.restaurant-card { border-left: 3px solid var(--clay); }
+.restaurant-tag {
+  font-size: .65rem; font-weight: 700; color: var(--clay);
+  background: var(--clay-l); border-radius: 4px;
+  padding: .1rem .4rem; margin-left: .5rem; vertical-align: middle;
+}
+.cuisine-tag {
+  background: var(--sand2); color: var(--muted);
+  border-radius: 6px; padding: .15rem .5rem;
+  font-size: .7rem; font-weight: 600;
+}
+
+/* Activity action buttons */
+.trip-activity-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .6rem; }
+.trip-action-btn {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .4rem .85rem; border-radius: 8px;
+  font-size: .78rem; font-weight: 600; text-decoration: none;
+  transition: all .2s; cursor: pointer; border: none;
+}
+.trip-action-btn.maps { background: var(--sand); color: var(--ink); border: 1px solid var(--border2); }
+.trip-action-btn.maps:hover { background: var(--sand2); }
+.trip-action-btn.book { background: var(--clay); color: #fff; }
+.trip-action-btn.book:hover { background: #b07d48; }
+
+/* Hotel note */
+.trip-hotel-note {
+  display: flex; align-items: flex-start; gap: .75rem;
+  background: var(--sand); border: 1px solid var(--border2);
+  border-radius: 14px; padding: 1rem 1.2rem;
+  font-size: .85rem; color: var(--muted); line-height: 1.6;
+  margin-top: 1.5rem;
+}
+
+/* Booking tab */
+.trip-book { display: flex; flex-direction: column; gap: 2rem; }
+.trip-book-section { }
+.trip-book-section-title {
+  font-family: var(--font-display); font-size: 1.05rem; font-weight: 700;
+  color: var(--ink); margin-bottom: 1rem;
+  padding-bottom: .5rem; border-bottom: 2px solid var(--border);
+}
+.trip-book-card {
+  background: var(--white); border: 1.5px solid var(--border2);
+  border-radius: 16px; padding: 1.2rem 1.4rem;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; margin-bottom: .75rem;
+  transition: box-shadow .2s, border-color .2s;
+}
+.trip-book-card:hover { box-shadow: var(--shadow); border-color: var(--clay); }
+.trip-book-card-info { flex: 1; }
+.trip-book-card-name { font-family: var(--font-display); font-size: .95rem; font-weight: 700; color: var(--ink); margin-bottom: .2rem; }
+.trip-book-card-desc { font-size: .82rem; color: var(--muted); margin-bottom: .25rem; line-height: 1.45; }
+.trip-book-card-route { font-size: .78rem; color: var(--clay); font-weight: 600; }
+.trip-book-card-price { font-size: .82rem; font-weight: 700; color: var(--clay); margin-top: .2rem; }
+.trip-book-btn {
+  background: var(--clay); color: #fff;
+  border: none; border-radius: 10px; padding: .6rem 1.2rem;
+  font-size: .85rem; font-weight: 700; cursor: pointer;
+  text-decoration: none; white-space: nowrap;
+  transition: all .2s; flex-shrink: 0;
+  display: inline-flex; align-items: center;
+}
+.trip-book-btn:hover { background: #b07d48; transform: translateY(-1px); }
