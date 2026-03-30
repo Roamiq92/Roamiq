@@ -9,6 +9,9 @@ interface OnboardingData {
   budget: string;
   interests: string[];
   pace: string;
+  cuisines: string[];
+  dietaryNeeds: string[];
+  diningBudget: string;
 }
 
 const BUDGET_MAP: Record<string, string> = {
@@ -16,7 +19,11 @@ const BUDGET_MAP: Record<string, string> = {
   high: "comfort €200-400/gg", luxury: "lusso >€400/gg",
 };
 const PACE_MAP: Record<string, string> = {
-  lento: "3 attività/giorno", equilibrato: "4 attività/giorno", intenso: "5 attività/giorno",
+  lento: "3 attività/giorno", equilibrato: "4 attività/giorno", intenso: "5+ attività/giorno",
+};
+const DINING_MAP: Record<string, string> = {
+  street: "street food e mercati", casual: "trattorie e bistrot casual",
+  restaurant: "ristoranti curati", fine: "fine dining e alta cucina",
 };
 
 export async function POST(req: Request) {
@@ -33,26 +40,42 @@ export async function POST(req: Request) {
     (new Date(body.endDate).getTime() - new Date(body.startDate).getTime()) / 86400000
   )));
 
-  const activitiesCount = PACE_MAP[body.pace] ?? "4 attività/giorno";
-
-  // Costruisci l'array di date
   const dateArray = Array.from({ length: days }, (_, i) => {
     const d = new Date(body.startDate);
     d.setDate(d.getDate() + i);
     return d.toISOString().split("T")[0];
   });
 
-  const prompt = `Sei ROAMIQ travel planner. Genera un itinerario per ${days} giorni a ${body.destination}.
-Dati: partenza ${body.departureCity}, gruppo ${body.travelers}, budget ${BUDGET_MAP[body.budget] ?? body.budget}, ritmo ${activitiesCount}, interessi: ${body.interests.slice(0, 3).join(", ")}.
+  const foodPrefs = [
+    body.cuisines?.length ? `cucine preferite: ${body.cuisines.join(", ")}` : "",
+    body.dietaryNeeds?.length ? `esigenze: ${body.dietaryNeeds.join(", ")}` : "",
+    body.diningBudget ? `tipo ristorazione: ${DINING_MAP[body.diningBudget] ?? body.diningBudget}` : "",
+  ].filter(Boolean).join(" | ");
 
-Rispondi SOLO con JSON, niente altro testo o markdown.
-Il JSON deve avere questa struttura esatta:
+  const prompt = `Sei ROAMIQ travel planner. Genera un itinerario completo per ${days} giorni a ${body.destination}.
+
+DATI:
+- Partenza: ${body.departureCity} → ${body.destination}
+- Date: ${dateArray.join(", ")}
+- Gruppo: ${body.travelers}
+- Budget: ${BUDGET_MAP[body.budget] ?? body.budget}
+- Ritmo: ${PACE_MAP[body.pace] ?? body.pace}
+- Interessi: ${body.interests?.slice(0,4).join(", ")}
+- Preferenze cibo: ${foodPrefs || "nessuna specifica"}
+
+ISTRUZIONI:
+- Ogni giorno deve avere sia ATTIVITÀ che RISTORANTI (pranzo e cena)
+- I ristoranti devono essere reali e specifici di ${body.destination}
+- Rispetta le preferenze alimentari dell'utente
+- Alterna tipi di ristorante (non sempre lo stesso stile)
+
+Rispondi SOLO con JSON valido, nessun testo o markdown:
 
 {
   "destination": "${body.destination}",
   "country": "nome paese",
   "emoji": "🏳️",
-  "summary": "una frase evocativa sul viaggio",
+  "summary": "frase evocativa e ispirazionale",
   "totalCostMin": 400,
   "totalCostMax": 700,
   "days": [
@@ -64,13 +87,28 @@ Il JSON deve avere questa struttura esatta:
         {
           "time": "09:00",
           "name": "nome posto reale",
-          "description": "descrizione 1 frase",
+          "description": "descrizione coinvolgente 1-2 frasi",
           "duration": "2h",
           "priceMin": 0,
           "priceMax": 15,
           "category": "cultura",
-          "tip": "consiglio pratico",
-          "bookingRequired": false
+          "tip": "consiglio insider pratico",
+          "bookingRequired": false,
+          "type": "activity"
+        },
+        {
+          "time": "13:00",
+          "name": "nome ristorante reale",
+          "description": "descrizione piatti e atmosfera",
+          "duration": "1.5h",
+          "priceMin": 15,
+          "priceMax": 35,
+          "category": "food",
+          "tip": "cosa ordinare e quando prenotare",
+          "bookingRequired": true,
+          "type": "restaurant",
+          "cuisine": "tipo cucina",
+          "googleMapsQuery": "nome ristorante ${body.destination}"
         }
       ]
     }
@@ -79,26 +117,22 @@ Il JSON deve avere questa struttura esatta:
     {
       "name": "nome hotel reale",
       "stars": 3,
-      "zone": "quartiere",
+      "zone": "quartiere specifico",
       "pricePerNight": 90,
-      "why": "perché consigliato"
+      "why": "perché è perfetto per questo profilo",
+      "googleHotelsQuery": "nome hotel ${body.destination}"
     }
   ],
-  "localTips": ["tip 1", "tip 2", "tip 3"],
-  "bestFor": "per chi è questo viaggio"
+  "localTips": ["tip autentico 1", "tip autentico 2", "tip autentico 3"],
+  "bestFor": "per chi è perfetto questo viaggio"
 }
 
-REGOLE:
-- Genera esattamente ${days} giorni con date: ${dateArray.join(", ")}
-- Ogni giorno: esattamente 4 attività reali e specifiche di ${body.destination}
-- L'emoji deve essere la bandiera del paese (es 🇪🇸 per Spagna)
-- Solo JSON valido, nessun testo prima o dopo`;
+Genera TUTTI i ${days} giorni. Ogni giorno: almeno 3 attività + pranzo + cena (5 item totali). Solo JSON.`;
 
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
-      // Byte iniziale immediato → evita timeout Vercel 25s
       controller.enqueue(encoder.encode(" "));
 
       try {
@@ -132,30 +166,25 @@ REGOLE:
           return;
         }
 
-        // Estrai JSON — trova la prima { e l'ultima }
         const start = rawText.indexOf("{");
         const end = rawText.lastIndexOf("}");
 
         if (start === -1 || end === -1 || end <= start) {
-          controller.enqueue(encoder.encode(JSON.stringify({ error: "Nessun JSON trovato nella risposta" })));
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "Nessun JSON nella risposta AI" })));
           controller.close();
           return;
         }
-
-        const jsonStr = rawText.slice(start, end + 1);
 
         let itinerary;
         try {
-          itinerary = JSON.parse(jsonStr);
-        } catch (parseErr) {
-          controller.enqueue(encoder.encode(JSON.stringify({
-            error: `JSON troncato o non valido. Token insufficienti? Lunghezza risposta: ${rawText.length}`
-          })));
+          itinerary = JSON.parse(rawText.slice(start, end + 1));
+        } catch {
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON non valido nella risposta AI" })));
           controller.close();
           return;
         }
 
-        // Salva su Supabase (non bloccante)
+        // Salva su Supabase
         let tripId = "demo";
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -194,13 +223,11 @@ REGOLE:
         controller.close();
 
       } catch (err) {
-        controller.enqueue(encoder.encode(JSON.stringify({ error: `Errore interno: ${String(err)}` })));
+        controller.enqueue(encoder.encode(JSON.stringify({ error: `Errore: ${String(err)}` })));
         controller.close();
       }
     },
   });
 
-  return new Response(stream, {
-    headers: { "Content-Type": "application/json" },
-  });
+  return new Response(stream, { headers: { "Content-Type": "application/json" } });
 }
