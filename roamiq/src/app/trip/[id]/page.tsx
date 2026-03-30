@@ -4,18 +4,18 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase-browser";
+import {
+  bookingUrl, getYourGuideUrl, skyscannerUrl,
+  openTableUrl, googleMapsUrl,
+} from "@/lib/affiliates";
 
-/* ── Types ── */
 interface Activity {
   time: string; name: string; description: string; duration: string;
   priceMin: number; priceMax: number; category: string; tip: string;
-  bookingRequired: boolean; type?: string; cuisine?: string; googleMapsQuery?: string;
+  bookingRequired: boolean; type?: string; cuisine?: string;
 }
 interface Day { day: number; date: string; theme: string; activities: Activity[]; }
-interface Hotel {
-  name: string; stars: number; zone: string; pricePerNight: number;
-  why: string; googleHotelsQuery?: string;
-}
+interface Hotel { name: string; stars: number; zone: string; pricePerNight: number; why: string; }
 interface Itinerary {
   destination: string; country: string; emoji: string; summary: string;
   totalCostMin: number; totalCostMax: number;
@@ -26,37 +26,10 @@ interface TripRecord {
   travelers: string; budget: string; itinerary: Itinerary;
 }
 
-/* ── Booking URL builders ── */
-function googleHotelsUrl(hotelName: string, destination: string, checkIn: string, checkOut: string) {
-  const query = encodeURIComponent(`${hotelName} ${destination}`);
-  return `https://www.google.com/travel/hotels/entity/${query}?q=${query}&ved=0&checkin=${checkIn}&checkout=${checkOut}`;
-}
-
-function googleFlightsUrl(from: string, destination: string, date: string) {
-  const f = encodeURIComponent(from);
-  const t = encodeURIComponent(destination);
-  return `https://www.google.com/flights?hl=it#flt=${f}.${t}.${date}`;
-}
-
-function getYourGuideUrl(activity: string, destination: string) {
-  const q = encodeURIComponent(`${activity} ${destination}`);
-  return `https://www.getyourguide.com/s/?q=${q}&partner_id=ROAMIQ`;
-}
-
-function googleMapsUrl(query: string) {
-  return `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
-}
-
-function openTableUrl(restaurant: string, destination: string) {
-  const q = encodeURIComponent(`${restaurant} ${destination}`);
-  return `https://www.opentable.it/s/?term=${q}`;
-}
-
-/* ── Helpers ── */
 const CATEGORY_CONFIG: Record<string, { icon: string; color: string }> = {
-  cultura:   { icon: "🏛️", color: "#F5F0E8" }, food: { icon: "🍽️", color: "#FFF8EE" },
+  cultura:   { icon: "🏛️", color: "#F5F0E8" }, food:      { icon: "🍽️", color: "#FFF8EE" },
   natura:    { icon: "🌿", color: "#F0FDF4" }, nightlife: { icon: "🎶", color: "#FDF4FF" },
-  shopping:  { icon: "🛍️", color: "#FFF1F2" }, sport: { icon: "⚡", color: "#ECFEFF" },
+  shopping:  { icon: "🛍️", color: "#FFF1F2" }, sport:     { icon: "⚡", color: "#ECFEFF" },
   relax:     { icon: "🧘", color: "#F0FDFA" }, trasporto: { icon: "🚇", color: "#F8FAFC" },
   alloggio:  { icon: "🏨", color: "#F0F9FF" },
 };
@@ -64,6 +37,7 @@ function getCat(cat: string) { return CATEGORY_CONFIG[cat] ?? { icon: "📍", co
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" });
 }
+function partySize(t: string) { return t === "coppia" ? 2 : t === "famiglia" ? 4 : t === "amici" ? 4 : 1; }
 function StarRating({ n }: { n: number }) {
   return <span className="trip-stars">{Array.from({ length: 5 }, (_, i) => <span key={i}>{i < n ? "★" : "☆"}</span>)}</span>;
 }
@@ -79,17 +53,46 @@ function TripSkeleton() {
   );
 }
 
-/* ── Main ── */
+function LoginGate({ tab }: { tab: string }) {
+  return (
+    <div className="trip-gate">
+      <div className="trip-gate-card">
+        <div className="trip-gate-icon">{tab === "hotels" ? "🏨" : "🎫"}</div>
+        <h3 className="trip-gate-title">
+          {tab === "hotels" ? "Scopri gli hotel selezionati" : "Prenota il tuo viaggio"}
+        </h3>
+        <p className="trip-gate-sub">
+          {tab === "hotels"
+            ? "Crea un account gratuito per vedere gli hotel consigliati dall'AI con prezzi aggiornati."
+            : "Registrati per prenotare voli, hotel, esperienze e ristoranti — tutto da qui."}
+        </p>
+        <div className="trip-gate-actions">
+          <Link href="/register" className="trip-gate-btn-primary">Registrati gratis →</Link>
+          <Link href="/login" className="trip-gate-btn-ghost">Ho già un account</Link>
+        </div>
+        <p className="trip-gate-note">✓ Gratis · ✓ Nessuna carta · ✓ 30 secondi</p>
+      </div>
+    </div>
+  );
+}
+
 export default function TripPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [trip, setTrip] = useState<TripRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeDay, setActiveDay] = useState(0);
   const [activeTab, setActiveTab] = useState<"itinerary"|"hotels"|"tips"|"book">("itinerary");
 
   useEffect(() => {
     async function load() {
+      try {
+        const supabase = createBrowserClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        setIsLoggedIn(!!user);
+      } catch { /* ignora */ }
+
       const cached = sessionStorage.getItem("roamiq_last_trip");
       if (cached) {
         try {
@@ -101,6 +104,7 @@ export default function TripPage() {
           }
         } catch { /* ignora */ }
       }
+
       if (id !== "demo") {
         try {
           const supabase = createBrowserClient();
@@ -108,6 +112,7 @@ export default function TripPage() {
           if (!error && data) { setTrip(data as TripRecord); setLoading(false); return; }
         } catch { /* ignora */ }
       }
+
       router.push("/onboarding");
     }
     load();
@@ -120,10 +125,17 @@ export default function TripPage() {
   const currentDay = itin.days[activeDay];
   const totalDays = itin.days.length;
   const daysCost = Math.round(itin.totalCostMin / totalDays);
+  const size = partySize(trip.travelers);
+
+  const allRestaurants = itin.days.flatMap(d => d.activities)
+    .filter(a => a.type === "restaurant" || a.category === "food");
+  const allBookable = itin.days.flatMap(d => d.activities)
+    .filter(a => a.bookingRequired && a.type !== "restaurant" && a.category !== "food");
+
+  const isLocked = (tab: string) => !isLoggedIn && ["hotels", "book"].includes(tab);
 
   return (
     <div className="trip-page">
-      {/* NAV */}
       <nav className="trip-nav">
         <Link href="/" className="ob-logo">ROAM<span>IQ</span></Link>
         <div className="trip-nav-meta">
@@ -132,19 +144,20 @@ export default function TripPage() {
           <span>{totalDays} giorni</span>
         </div>
         <div className="trip-nav-actions">
-          <Link href="/onboarding" className="trip-btn-ghost">↩ Modifica</Link>
-          <button className="trip-btn-primary"
-            onClick={() => setActiveTab("book")}>
+          {isLoggedIn
+            ? <Link href="/dashboard" className="trip-btn-ghost">I miei viaggi</Link>
+            : <Link href="/register" className="trip-btn-ghost">Registrati gratis</Link>
+          }
+          <button className="trip-btn-primary" onClick={() => setActiveTab("book")}>
             Prenota tutto →
           </button>
         </div>
       </nav>
 
-      {/* HERO */}
       <header className="trip-hero">
         <div className="trip-hero-bg" style={{ background: "linear-gradient(135deg, #1A1209 0%, #2D2416 50%, #1A1209 100%)" }} />
         <div className="trip-hero-content">
-          <div className="trip-hero-badge">✨ Itinerario AI • Personalizzato per te</div>
+          <div className="trip-hero-badge">✨ Itinerario AI · Personalizzato per te</div>
           <h1 className="trip-hero-title">{itin.emoji} {itin.destination}</h1>
           <p className="trip-hero-summary">{itin.summary}</p>
           <div className="trip-hero-meta">
@@ -163,25 +176,25 @@ export default function TripPage() {
         </div>
       </header>
 
-      {/* TABS */}
       <div className="trip-tabs-bar">
         <div className="trip-tabs">
           {([
             { id: "itinerary", label: "📅 Itinerario" },
-            { id: "hotels",    label: "🏨 Hotel" },
             { id: "tips",      label: "💡 Consigli" },
-            { id: "book",      label: "🎫 Prenota" },
+            { id: "hotels",    label: isLocked("hotels") ? "🔒 Hotel" : "🏨 Hotel" },
+            { id: "book",      label: isLocked("book")   ? "🔒 Prenota" : "🎫 Prenota" },
           ] as const).map((tab) => (
-            <button key={tab.id} className={`trip-tab ${activeTab === tab.id ? "active" : ""}`}
-              onClick={() => setActiveTab(tab.id)}>{tab.label}</button>
+            <button key={tab.id}
+              className={`trip-tab ${activeTab === tab.id ? "active" : ""} ${isLocked(tab.id) ? "locked" : ""}`}
+              onClick={() => setActiveTab(tab.id)}>
+              {tab.label}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* BODY */}
       <main className="trip-main">
 
-        {/* ITINERARY */}
         {activeTab === "itinerary" && (
           <div className="trip-itinerary">
             <div className="trip-day-selector">
@@ -220,36 +233,32 @@ export default function TripPage() {
                               <span>⏱ {act.duration}</span>
                               <span>{act.priceMin === 0 && act.priceMax === 0 ? "Gratuito" : `€${act.priceMin}–€${act.priceMax}`}</span>
                               {act.cuisine && <span className="cuisine-tag">{act.cuisine}</span>}
-                              {act.bookingRequired && <span className="trip-booking-badge">Prenotazione consigliata</span>}
                             </div>
                           </div>
                         </div>
                         <p className="trip-activity-desc">{act.description}</p>
                         {act.tip && <div className="trip-activity-tip"><span>💡</span><span>{act.tip}</span></div>}
-
-                        {/* Booking buttons */}
                         <div className="trip-activity-actions">
-                          {isRestaurant ? (
-                            <>
-                              <a href={googleMapsUrl(act.googleMapsQuery ?? `${act.name} ${itin.destination}`)}
-                                target="_blank" rel="noopener noreferrer" className="trip-action-btn maps">
-                                📍 Vedi su Maps
-                              </a>
-                              <a href={openTableUrl(act.name, itin.destination)}
-                                target="_blank" rel="noopener noreferrer" className="trip-action-btn book">
-                                🍽️ Prenota tavolo
-                              </a>
-                            </>
-                          ) : act.bookingRequired ? (
+                          <a href={googleMapsUrl(`${act.name} ${itin.destination}`)}
+                            target="_blank" rel="noopener noreferrer" className="trip-action-btn maps">
+                            📍 Mappa
+                          </a>
+                          {isLoggedIn && isRestaurant && (
+                            <a href={openTableUrl(act.name, itin.destination, currentDay.date, size)}
+                              target="_blank" rel="noopener noreferrer" className="trip-action-btn book">
+                              🍽️ Prenota tavolo
+                            </a>
+                          )}
+                          {isLoggedIn && !isRestaurant && act.bookingRequired && (
                             <a href={getYourGuideUrl(act.name, itin.destination)}
                               target="_blank" rel="noopener noreferrer" className="trip-action-btn book">
                               🎫 Prenota biglietto
                             </a>
-                          ) : (
-                            <a href={googleMapsUrl(`${act.name} ${itin.destination}`)}
-                              target="_blank" rel="noopener noreferrer" className="trip-action-btn maps">
-                              📍 Vedi su Maps
-                            </a>
+                          )}
+                          {!isLoggedIn && act.bookingRequired && (
+                            <Link href="/register" className="trip-action-btn book">
+                              🔒 Accedi per prenotare
+                            </Link>
                           )}
                         </div>
                       </div>
@@ -265,62 +274,6 @@ export default function TripPage() {
           </div>
         )}
 
-        {/* HOTELS */}
-        {activeTab === "hotels" && (
-          <div className="trip-hotels">
-            <div className="trip-section-header">
-              <h2 className="trip-section-title">Hotel consigliati dall&apos;AI</h2>
-              <p className="trip-section-sub">Prezzi diretti senza intermediari. Confronta e prenota al miglior prezzo.</p>
-            </div>
-            <div className="trip-hotels-grid">
-              {itin.hotels.map((hotel, i) => (
-                <div key={i} className={`trip-hotel-card ${i === 0 ? "featured" : ""}`}>
-                  {i === 0 && <div className="trip-hotel-badge">⭐ Top pick AI</div>}
-                  <div className="trip-hotel-header">
-                    <div>
-                      <div className="trip-hotel-name">{hotel.name}</div>
-                      <div className="trip-hotel-zone">📍 {hotel.zone}</div>
-                    </div>
-                    <StarRating n={hotel.stars} />
-                  </div>
-                  <p className="trip-hotel-why">{hotel.why}</p>
-                  <div className="trip-hotel-footer">
-                    <div>
-                      <div className="trip-hotel-price">€{hotel.pricePerNight}</div>
-                      <div className="trip-hotel-price-label">a notte</div>
-                    </div>
-                    <div style={{ display: "flex", gap: "0.5rem", flexDirection: "column" }}>
-                      <a
-                        href={googleHotelsUrl(hotel.name, itin.destination, trip.start_date, trip.end_date)}
-                        target="_blank" rel="noopener noreferrer"
-                        className="trip-hotel-btn"
-                        style={{ textDecoration: "none", textAlign: "center" }}
-                      >
-                        🏨 Google Hotels
-                      </a>
-                      <a
-                        href={`https://www.google.com/maps/search/${encodeURIComponent(hotel.name + " " + itin.destination)}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="trip-hotel-btn"
-                        style={{ textDecoration: "none", textAlign: "center", opacity: 0.8 }}
-                      >
-                        📍 Vedi posizione
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Google Hotels embed note */}
-            <div className="trip-hotel-note">
-              <span>🔍</span>
-              <span>Cliccando su &quot;Google Hotels&quot; vedrai tutti i prezzi disponibili, incluso il sito ufficiale dell&apos;hotel. Nessuna commissione aggiuntiva.</span>
-            </div>
-          </div>
-        )}
-
-        {/* TIPS */}
         {activeTab === "tips" && (
           <div className="trip-tips">
             <div className="trip-section-header">
@@ -342,102 +295,138 @@ export default function TripPage() {
           </div>
         )}
 
-        {/* BOOK */}
-        {activeTab === "book" && (
-          <div className="trip-book">
-            <div className="trip-section-header">
-              <h2 className="trip-section-title">Prenota il tuo viaggio</h2>
-              <p className="trip-section-sub">Tutto in un posto. Prezzi reali, senza sorprese.</p>
-            </div>
-
-            {/* VOLI */}
-            <div className="trip-book-section">
-              <div className="trip-book-section-title">✈️ Voli</div>
-              <div className="trip-book-card">
-                <div className="trip-book-card-info">
-                  <div className="trip-book-card-name">Google Flights</div>
-                  <div className="trip-book-card-desc">Confronta tutti i voli disponibili al miglior prezzo</div>
-                  <div className="trip-book-card-route">{trip.destination} · {formatDate(trip.start_date)} → {formatDate(trip.end_date)}</div>
-                </div>
-                <a
-                  href={googleFlightsUrl(trip.destination, itin.destination, trip.start_date)}
-                  target="_blank" rel="noopener noreferrer"
-                  className="trip-book-btn"
-                >
-                  Cerca voli →
-                </a>
+        {activeTab === "hotels" && (
+          isLocked("hotels") ? <LoginGate tab="hotels" /> : (
+            <div className="trip-hotels">
+              <div className="trip-section-header">
+                <h2 className="trip-section-title">Hotel selezionati dall&apos;AI</h2>
+                <p className="trip-section-sub">Prezzi aggiornati in tempo reale.</p>
+              </div>
+              <div className="trip-hotels-grid">
+                {itin.hotels.map((hotel, i) => (
+                  <div key={i} className={`trip-hotel-card ${i === 0 ? "featured" : ""}`}>
+                    {i === 0 && <div className="trip-hotel-badge">⭐ Top pick AI</div>}
+                    <div className="trip-hotel-header">
+                      <div>
+                        <div className="trip-hotel-name">{hotel.name}</div>
+                        <div className="trip-hotel-zone">📍 {hotel.zone}</div>
+                      </div>
+                      <StarRating n={hotel.stars} />
+                    </div>
+                    <p className="trip-hotel-why">{hotel.why}</p>
+                    <div className="trip-hotel-footer">
+                      <div>
+                        <div className="trip-hotel-price">da €{hotel.pricePerNight}</div>
+                        <div className="trip-hotel-price-label">a notte</div>
+                      </div>
+                      <a href={bookingUrl(hotel.name + " " + itin.destination, trip.start_date, trip.end_date, trip.travelers)}
+                        target="_blank" rel="noopener noreferrer"
+                        className="trip-hotel-btn" style={{ textDecoration: "none", textAlign: "center" }}>
+                        Verifica prezzi →
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="trip-hotel-note">
+                <span>💡</span>
+                <span>Prezzi e disponibilità aggiornati in tempo reale.</span>
               </div>
             </div>
+          )
+        )}
 
-            {/* HOTEL */}
-            <div className="trip-book-section">
-              <div className="trip-book-section-title">🏨 Hotel</div>
-              {itin.hotels.slice(0, 2).map((hotel, i) => (
-                <div key={i} className="trip-book-card">
+        {activeTab === "book" && (
+          isLocked("book") ? <LoginGate tab="book" /> : (
+            <div className="trip-book">
+              <div className="trip-section-header">
+                <h2 className="trip-section-title">Prenota il tuo viaggio</h2>
+                <p className="trip-section-sub">Tutto in un posto. Prezzi reali, zero sorprese.</p>
+              </div>
+              <div className="trip-book-section">
+                <div className="trip-book-section-title">✈️ Volo</div>
+                <div className="trip-book-card">
                   <div className="trip-book-card-info">
-                    <div className="trip-book-card-name">{hotel.name} {"★".repeat(hotel.stars)}</div>
-                    <div className="trip-book-card-desc">{hotel.zone} · {hotel.why}</div>
-                    <div className="trip-book-card-price">da €{hotel.pricePerNight}/notte</div>
+                    <div className="trip-book-card-name">Cerca i migliori voli</div>
+                    <div className="trip-book-card-desc">Confronta centinaia di voli per {itin.destination}.</div>
+                    <div className="trip-book-card-route">{formatDate(trip.start_date)} → {formatDate(trip.end_date)} · {size} {size === 1 ? "persona" : "persone"}</div>
                   </div>
-                  <a
-                    href={googleHotelsUrl(hotel.name, itin.destination, trip.start_date, trip.end_date)}
-                    target="_blank" rel="noopener noreferrer"
-                    className="trip-book-btn"
-                  >
-                    Verifica prezzi →
-                  </a>
+                  <a href={skyscannerUrl(trip.destination, itin.destination, trip.start_date, trip.travelers)}
+                    target="_blank" rel="noopener noreferrer" className="trip-book-btn">Cerca voli →</a>
                 </div>
-              ))}
-            </div>
-
-            {/* ESPERIENZE */}
-            <div className="trip-book-section">
-              <div className="trip-book-section-title">🎭 Esperienze e biglietti</div>
-              {itin.days.flatMap(d => d.activities).filter(a => a.bookingRequired && a.type !== "restaurant").slice(0, 4).map((act, i) => (
-                <div key={i} className="trip-book-card">
-                  <div className="trip-book-card-info">
-                    <div className="trip-book-card-name">{act.name}</div>
-                    <div className="trip-book-card-desc">{act.description?.slice(0, 80)}...</div>
-                    <div className="trip-book-card-price">€{act.priceMin}–€{act.priceMax} p.p.</div>
+              </div>
+              <div className="trip-book-section">
+                <div className="trip-book-section-title">🏨 Hotel</div>
+                {itin.hotels.map((hotel, i) => (
+                  <div key={i} className="trip-book-card">
+                    <div className="trip-book-card-info">
+                      <div className="trip-book-card-name">{hotel.name} <StarRating n={hotel.stars} /></div>
+                      <div className="trip-book-card-desc">{hotel.zone} · {hotel.why}</div>
+                      <div className="trip-book-card-price">da €{hotel.pricePerNight}/notte</div>
+                    </div>
+                    <a href={bookingUrl(hotel.name + " " + itin.destination, trip.start_date, trip.end_date, trip.travelers)}
+                      target="_blank" rel="noopener noreferrer" className="trip-book-btn">Prenota →</a>
                   </div>
-                  <a
-                    href={getYourGuideUrl(act.name, itin.destination)}
-                    target="_blank" rel="noopener noreferrer"
-                    className="trip-book-btn"
-                  >
-                    Prenota →
-                  </a>
+                ))}
+              </div>
+              {allBookable.length > 0 && (
+                <div className="trip-book-section">
+                  <div className="trip-book-section-title">🎭 Esperienze</div>
+                  {allBookable.slice(0, 5).map((act, i) => (
+                    <div key={i} className="trip-book-card">
+                      <div className="trip-book-card-info">
+                        <div className="trip-book-card-name">{act.name}</div>
+                        <div className="trip-book-card-desc">{act.tip}</div>
+                        <div className="trip-book-card-price">€{act.priceMin}–€{act.priceMax} p.p.</div>
+                      </div>
+                      <a href={getYourGuideUrl(act.name, itin.destination)}
+                        target="_blank" rel="noopener noreferrer" className="trip-book-btn">Prenota →</a>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-
-            {/* RISTORANTI */}
-            <div className="trip-book-section">
-              <div className="trip-book-section-title">🍽️ Ristoranti consigliati</div>
-              {itin.days.flatMap(d => d.activities).filter(a => a.type === "restaurant" || a.category === "food").slice(0, 4).map((act, i) => (
-                <div key={i} className="trip-book-card">
-                  <div className="trip-book-card-info">
-                    <div className="trip-book-card-name">{act.name}</div>
-                    <div className="trip-book-card-desc">{act.cuisine && `${act.cuisine} · `}{act.tip}</div>
-                    <div className="trip-book-card-price">€{act.priceMin}–€{act.priceMax} p.p.</div>
-                  </div>
-                  <a
-                    href={openTableUrl(act.name, itin.destination)}
-                    target="_blank" rel="noopener noreferrer"
-                    className="trip-book-btn"
-                  >
-                    Prenota tavolo →
-                  </a>
+              )}
+              {allRestaurants.length > 0 && (
+                <div className="trip-book-section">
+                  <div className="trip-book-section-title">🍽️ Ristoranti</div>
+                  {allRestaurants.slice(0, 5).map((act, i) => {
+                    const dayIndex = itin.days.findIndex(d => d.activities.includes(act));
+                    const date = itin.days[dayIndex >= 0 ? dayIndex : 0]?.date ?? trip.start_date;
+                    return (
+                      <div key={i} className="trip-book-card">
+                        <div className="trip-book-card-info">
+                          <div className="trip-book-card-name">{act.name}</div>
+                          <div className="trip-book-card-desc">{act.cuisine && `${act.cuisine} · `}{act.tip}</div>
+                          <div className="trip-book-card-price">€{act.priceMin}–€{act.priceMax} p.p.</div>
+                        </div>
+                        <a href={openTableUrl(act.name, itin.destination, date, size)}
+                          target="_blank" rel="noopener noreferrer" className="trip-book-btn">Prenota tavolo →</a>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
+              )}
+              <div className="trip-hotel-note" style={{ marginTop: "1rem" }}>
+                <span>🤝</span>
+                <span>ROAMIQ riceve una piccola commissione per ogni prenotazione. Per te il prezzo è sempre lo stesso.</span>
+              </div>
             </div>
+          )
+        )}
 
+        {!isLoggedIn && (
+          <div className="trip-register-banner">
+            <div className="trip-register-banner-content">
+              <div>
+                <div className="trip-register-banner-title">💾 Salva questo itinerario</div>
+                <div className="trip-register-banner-sub">Registrati gratis per salvarlo e prenotare tutto da qui.</div>
+              </div>
+              <Link href="/register" className="trip-register-banner-btn">Registrati gratis →</Link>
+            </div>
           </div>
         )}
 
       </main>
 
-      {/* STICKY BAR */}
       <div className="trip-sticky-bar">
         <div className="trip-sticky-info">
           <span className="trip-sticky-dest">{itin.emoji} {itin.destination} · {totalDays} giorni</span>
@@ -446,7 +435,7 @@ export default function TripPage() {
         <div className="trip-sticky-actions">
           <Link href="/onboarding" className="trip-sticky-btn ghost">↩ Ricrea</Link>
           <button className="trip-sticky-btn primary" onClick={() => setActiveTab("book")}>
-            Prenota tutto →
+            {isLoggedIn ? "Prenota tutto →" : "🔒 Prenota"}
           </button>
         </div>
       </div>
