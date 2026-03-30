@@ -4,10 +4,26 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase-browser";
-import {
-  bookingUrl, getYourGuideUrl, skyscannerUrl,
-  openTableUrl, googleMapsUrl,
-} from "@/lib/affiliates";
+
+/* ── URL builders (affiliate IDs da aggiungere prima del lancio) ── */
+function bookingUrl(destination: string, checkIn: string, checkOut: string, travelers: string) {
+  const adults = travelers === "coppia" ? 2 : travelers === "famiglia" ? 3 : travelers === "amici" ? 3 : 1;
+  const params = new URLSearchParams({ ss: destination, checkin: checkIn, checkout: checkOut, group_adults: String(adults), no_rooms: "1", lang: "it", selected_currency: "EUR" });
+  return `https://www.booking.com/searchresults.it.html?${params.toString()}`;
+}
+function getYourGuideUrl(activity: string, destination: string) {
+  return `https://www.getyourguide.it/s/?q=${encodeURIComponent(activity + " " + destination)}&currency=EUR&lang=it`;
+}
+function skyscannerUrl(from: string, to: string, date: string, travelers: string) {
+  const adults = travelers === "coppia" ? 2 : travelers === "famiglia" ? 3 : travelers === "amici" ? 3 : 1;
+  return `https://www.skyscanner.it/transport/voli/${encodeURIComponent(from)}/${encodeURIComponent(to)}/${date}/?adults=${adults}&currency=EUR`;
+}
+function openTableUrl(restaurant: string, destination: string, date: string, partySize: number) {
+  return `https://www.opentable.it/s/?term=${encodeURIComponent(restaurant + " " + destination)}&covers=${partySize}&dateTime=${date}T20:00&ref=roamiq`;
+}
+function googleMapsUrl(query: string) {
+  return `https://www.google.com/maps/search/${encodeURIComponent(query)}`;
+}
 
 interface Activity {
   time: string; name: string; description: string; duration: string;
