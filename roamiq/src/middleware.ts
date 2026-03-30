@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import type { ResponseCookie } from "next/dist/compiled/@edge-runtime/cookies";
 
 const PROTECTED_ROUTES = ["/dashboard", "/trip"];
 const AUTH_ROUTES = ["/login", "/register"];
@@ -21,7 +22,7 @@ export async function middleware(request: NextRequest) {
     "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://api.anthropic.com;"
   );
 
-  // Rate limiting API (max 10/ora per IP)
+  // Rate limiting API
   if (pathname.startsWith("/api/generate-itinerary")) {
     const ip = request.headers.get("x-forwarded-for") ?? "unknown";
     const rlCookie = request.cookies.get(`rl_${ip}`);
@@ -40,7 +41,6 @@ export async function middleware(request: NextRequest) {
   // Auth check
   const isProtected = PROTECTED_ROUTES.some((r) => pathname.startsWith(r));
   const isAuthRoute = AUTH_ROUTES.some((r) => pathname.startsWith(r));
-
   if (!isProtected && !isAuthRoute) return response;
 
   try {
@@ -49,10 +49,12 @@ export async function middleware(request: NextRequest) {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          getAll() { return request.cookies.getAll(); },
-          setAll(cookiesToSet) {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet: { name: string; value: string; options?: Partial<ResponseCookie> }[]) {
             cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options)
+              response.cookies.set(name, value, options ?? {})
             );
           },
         },
