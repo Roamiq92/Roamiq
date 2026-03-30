@@ -83,19 +83,20 @@ Genera TUTTI ${days} giorni con 4 attività reali ciascuno. Solo JSON.`;
           return;
         }
 
-        // Parse JSON
+        // Parse JSON — estrai direttamente il blocco { } ignorando qualsiasi markdown
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "Nessun JSON trovato nella risposta AI" })));
+          controller.close();
+          return;
+        }
         let itinerary;
         try {
-          const clean = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
-          itinerary = JSON.parse(clean);
+          itinerary = JSON.parse(jsonMatch[0]);
         } catch {
-          const match = rawText.match(/\{[\s\S]*\}/);
-          if (match) {
-            try { itinerary = JSON.parse(match[0]); }
-            catch { controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON parse failed: " + rawText.slice(0, 100) }))); controller.close(); return; }
-          } else {
-            controller.enqueue(encoder.encode(JSON.stringify({ error: "Nessun JSON: " + rawText.slice(0, 100) }))); controller.close(); return;
-          }
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON non valido: " + jsonMatch[0].slice(0, 80) })));
+          controller.close();
+          return;
         }
 
         // Salva su Supabase
