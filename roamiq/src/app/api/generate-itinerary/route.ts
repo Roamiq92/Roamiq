@@ -1,6 +1,5 @@
 export const runtime = "edge";
 
-/* ── Types ─────────────────────────────────────────────────── */
 interface OnboardingData {
   destination: string;
   departureCity: string;
@@ -13,55 +12,74 @@ interface OnboardingData {
 }
 
 const BUDGET_MAP: Record<string, string> = {
-  low:    "economico (meno di €80/giorno)",
-  mid:    "medio (€80–200/giorno)",
-  high:   "comfort (€200–400/giorno)",
-  luxury: "lusso (oltre €400/giorno)",
+  low: "economico sotto €80/giorno",
+  mid: "medio €80-200/giorno",
+  high: "comfort €200-400/giorno",
+  luxury: "lusso oltre €400/giorno",
 };
 
 const PACE_MAP: Record<string, string> = {
-  lento:       "rilassato (2–3 attività/giorno)",
-  equilibrato: "equilibrato (4–5 attività/giorno)",
-  intenso:     "intenso (6+ attività/giorno)",
+  lento: "rilassato 3 attività/giorno",
+  equilibrato: "equilibrato 4-5 attività/giorno",
+  intenso: "intenso 6+ attività/giorno",
 };
 
-function buildPrompt(data: OnboardingData): string {
+export async function POST(req: Request) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  // Controllo chiave API
+  if (!apiKey || !apiKey.startsWith("sk-ant-")) {
+    return Response.json(
+      { error: `API key non valida o mancante. Valore: ${apiKey ? "presente ma formato errato" : "assente"}` },
+      { status: 500 }
+    );
+  }
+
+  let body: OnboardingData;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Body non valido" }, { status: 400 });
+  }
+
+  if (!body.destination || !body.startDate || !body.endDate) {
+    return Response.json({ error: "Dati mancanti: destination, startDate o endDate" }, { status: 400 });
+  }
+
   const days = Math.ceil(
-    (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / 86400000
+    (new Date(body.endDate).getTime() - new Date(body.startDate).getTime()) / 86400000
   );
 
-  return `Sei ROAMIQ, AI travel planner. Genera un itinerario JSON completo.
+  const prompt = `Sei ROAMIQ, AI travel planner italiano. Genera un itinerario dettagliato e coinvolgente.
 
-Viaggio: ${data.departureCity} → ${data.destination}, ${days} giorni
-Partenza: ${data.startDate} | Ritorno: ${data.endDate}
-Gruppo: ${data.travelers} | Budget: ${BUDGET_MAP[data.budget] ?? data.budget}
-Ritmo: ${PACE_MAP[data.pace] ?? data.pace}
-Interessi: ${data.interests.join(", ")}
+VIAGGIO: ${body.departureCity} → ${body.destination} | ${days} giorni | ${body.startDate} → ${body.endDate}
+GRUPPO: ${body.travelers} | BUDGET: ${BUDGET_MAP[body.budget] ?? body.budget} | RITMO: ${PACE_MAP[body.pace] ?? body.pace}
+INTERESSI: ${body.interests.join(", ")}
 
-Rispondi SOLO con JSON valido, nessun testo aggiuntivo:
+Rispondi ESCLUSIVAMENTE con JSON valido, zero testo prima o dopo:
 
 {
-  "destination": "${data.destination}",
-  "country": "paese",
-  "emoji": "🏳️",
-  "summary": "descrizione evocativa del viaggio",
-  "totalCostMin": 500,
-  "totalCostMax": 800,
+  "destination": "${body.destination}",
+  "country": "nome paese",
+  "emoji": "emoji bandiera paese",
+  "summary": "frase evocativa e ispirazionale di 1 riga su questo viaggio specifico",
+  "totalCostMin": 450,
+  "totalCostMax": 750,
   "days": [
     {
       "day": 1,
-      "date": "${data.startDate}",
-      "theme": "tema del giorno",
+      "date": "${body.startDate}",
+      "theme": "Arrivo e prime scoperte",
       "activities": [
         {
-          "time": "09:00",
-          "name": "nome",
-          "description": "descrizione breve",
+          "time": "10:00",
+          "name": "nome attività reale",
+          "description": "descrizione coinvolgente con dettagli storici/culturali autentici",
           "duration": "2h",
           "priceMin": 0,
           "priceMax": 15,
           "category": "cultura",
-          "tip": "consiglio insider",
+          "tip": "consiglio pratico insider che i turisti non sanno",
           "bookingRequired": false
         }
       ]
@@ -69,75 +87,93 @@ Rispondi SOLO con JSON valido, nessun testo aggiuntivo:
   ],
   "hotels": [
     {
-      "name": "nome hotel",
+      "name": "nome hotel reale",
       "stars": 3,
-      "zone": "quartiere",
+      "zone": "quartiere specifico",
       "pricePerNight": 90,
-      "why": "perché consigliato"
+      "why": "perché è perfetto per questo profilo viaggiatore"
     }
   ],
-  "localTips": ["tip 1", "tip 2", "tip 3"],
-  "bestFor": "per chi è questo viaggio"
+  "localTips": [
+    "consiglio autentico 1",
+    "consiglio autentico 2",
+    "consiglio autentico 3"
+  ],
+  "bestFor": "descrizione di chi è perfetto questo viaggio"
 }
 
-Genera tutti e ${days} giorni. Ogni giorno: 4 attività minimo. Tutto in italiano. Solo JSON.`;
-}
+IMPORTANTE: genera TUTTI i ${days} giorni, ognuno con almeno 4 attività reali e specifiche di ${body.destination}. Prezzi in euro. Solo JSON.`;
 
-export async function POST(req: Request) {
+  let claudeRes: Response;
   try {
-    const body: OnboardingData = await req.json();
-
-    if (!body.destination || !body.startDate || !body.endDate) {
-      return Response.json({ error: "Dati mancanti" }, { status: 400 });
-    }
-
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+    claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY!,
+        "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
-        max_tokens: 4000,
-        messages: [{ role: "user", content: buildPrompt(body) }],
+        max_tokens: 3000,
+        messages: [{ role: "user", content: prompt }],
       }),
     });
+  } catch (fetchErr) {
+    return Response.json(
+      { error: `Fetch verso Anthropic fallito: ${String(fetchErr)}` },
+      { status: 500 }
+    );
+  }
 
-    if (!claudeRes.ok) {
-      const err = await claudeRes.text();
-      console.error("Claude error:", err);
-      return Response.json({ error: "Errore AI" }, { status: 500 });
-    }
+  if (!claudeRes.ok) {
+    const errText = await claudeRes.text();
+    return Response.json(
+      { error: `Anthropic ha risposto con errore ${claudeRes.status}: ${errText}` },
+      { status: 500 }
+    );
+  }
 
-    const claudeData = await claudeRes.json();
-    const rawText: string = claudeData.content?.[0]?.text ?? "";
+  const claudeData = await claudeRes.json();
+  const rawText: string = claudeData.content?.[0]?.text ?? "";
 
-    if (!rawText) {
-      return Response.json({ error: "Risposta AI vuota" }, { status: 500 });
-    }
+  if (!rawText) {
+    return Response.json(
+      { error: "Anthropic ha risposto ma il testo è vuoto" },
+      { status: 500 }
+    );
+  }
 
-    // Parse JSON robusto
-    let itinerary;
-    try {
-      const clean = rawText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
-      itinerary = JSON.parse(clean);
-    } catch {
-      const match = rawText.match(/\{[\s\S]*\}/);
-      if (match) {
-        try { itinerary = JSON.parse(match[0]); }
-        catch { return Response.json({ error: "Formato risposta non valido" }, { status: 500 }); }
-      } else {
-        return Response.json({ error: "Formato risposta non valido" }, { status: 500 });
+  // Parse JSON
+  let itinerary;
+  try {
+    const clean = rawText.replace(/```json\s*/gi, "").replace(/```\s*/g, "").trim();
+    itinerary = JSON.parse(clean);
+  } catch {
+    const match = rawText.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        itinerary = JSON.parse(match[0]);
+      } catch (e2) {
+        return Response.json(
+          { error: `JSON parse fallito. Risposta AI: ${rawText.slice(0, 200)}` },
+          { status: 500 }
+        );
       }
+    } else {
+      return Response.json(
+        { error: `Nessun JSON trovato nella risposta. Risposta AI: ${rawText.slice(0, 200)}` },
+        { status: 500 }
+      );
     }
+  }
 
-    // Salva su Supabase via fetch (edge-compatible)
+  // Salva su Supabase (non-bloccante)
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (supabaseUrl && supabaseKey) {
     try {
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
       const dbRes = await fetch(`${supabaseUrl}/rest/v1/trips`, {
         method: "POST",
         headers: {
@@ -160,21 +196,16 @@ export async function POST(req: Request) {
       });
 
       if (dbRes.ok) {
-        const dbData = await dbRes.json();
-        const tripId = Array.isArray(dbData) ? dbData[0]?.id : dbData?.id;
+        const saved = await dbRes.json();
+        const tripId = Array.isArray(saved) ? saved[0]?.id : saved?.id;
         if (tripId) {
           return Response.json({ tripId, itinerary });
         }
       }
-    } catch (dbErr) {
-      console.error("Supabase error (non-fatal):", dbErr);
+    } catch {
+      // Supabase fallito ma non blocca
     }
-
-    // Fallback senza salvataggio
-    return Response.json({ tripId: "demo", itinerary });
-
-  } catch (err) {
-    console.error("Error:", err);
-    return Response.json({ error: "Errore interno" }, { status: 500 });
   }
+
+  return Response.json({ tripId: "demo", itinerary });
 }
