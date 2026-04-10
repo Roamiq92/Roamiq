@@ -8,6 +8,10 @@ interface SuggestionRequest {
   budget: string;
 }
 
+const BUDGET_MAP: Record<string, string> = {
+  low: "economico", mid: "medio", high: "comfort", luxury: "lusso"
+};
+
 export async function POST(req: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY ?? "";
   if (!apiKey.startsWith("sk-ant-")) {
@@ -22,9 +26,36 @@ export async function POST(req: Request) {
     (new Date(body.endDate).getTime() - new Date(body.startDate).getTime()) / 86400000
   );
 
-  const budgetLabel: Record<string, string> = {
-    low: "economico", mid: "medio", high: "comfort", luxury: "lusso"
-  };
+  const month = new Date(body.startDate).toLocaleDateString("it-IT", { month: "long" });
+  const budget = BUDGET_MAP[body.budget] ?? body.budget;
+
+  const prompt = `Sei un travel planner esperto. Suggerisci 5 destinazioni di viaggio ideali per:
+- Partenza da: ${body.departureCity}
+- Durata: ${days} giorni in ${month}
+- Budget: ${budget}
+- Gruppo: ${body.travelers}
+
+Considera: stagione, clima, distanza ragionevole, varietà di esperienze.
+Proponi destinazioni diverse tra loro (mix di città d'arte, natura, mare, cultura).
+
+Rispondi SOLO con questo JSON:
+{
+  "suggestions": [
+    {
+      "city": "nome città",
+      "country": "paese",
+      "emoji": "emoji bandiera",
+      "tagline": "frase evocativa breve",
+      "why": "perché è perfetta in questo periodo per questo profilo (2 frasi)",
+      "highlights": ["attrazione1", "attrazione2", "esperienza tipica"],
+      "estimatedCostMin": 400,
+      "estimatedCostMax": 700,
+      "flightTime": "2h 30min"
+    }
+  ]
+}
+
+5 destinazioni diverse, solo JSON valido.`;
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -41,55 +72,39 @@ export async function POST(req: Request) {
           body: JSON.stringify({
             model: "claude-haiku-4-5-20251001",
             max_tokens: 2000,
-            messages: [
-              {
-                role: "user",
-                content: `Suggerisci 5 destinazioni di viaggio per una persona/gruppo che parte da ${body.departureCity}, ${days} giorni, budget ${budgetLabel[body.budget] ?? body.budget}, ${body.travelers}.
-
-Considera stagione (partenza ${body.startDate}), distanza ragionevole, e varietà di esperienze.
-
-Rispondi SOLO con JSON:`,
-              },
-              {
-                role: "assistant",
-                content: `{
-  "suggestions": [
-    {
-      "city": "nome città",
-      "country": "paese",
-      "emoji": "🏳️",
-      "tagline": "frase breve evocativa",
-      "why": "perché è perfetta per questo profilo in questa stagione",
-      "highlights": ["highlight1", "highlight2", "highlight3"],
-      "estimatedCostMin": 400,
-      "estimatedCostMax": 700,
-      "flightTime": "2h"
-    }
-  ]
-}`,
-              },
-            ],
+            messages: [{ role: "user", content: prompt }],
           }),
         });
 
         if (!res.ok) {
-          controller.enqueue(encoder.encode(JSON.stringify({ error: "Errore AI" })));
+          const err = await res.text();
+          controller.enqueue(encoder.encode(JSON.stringify({ error: `Errore AI: ${err.slice(0,100)}` })));
           controller.close();
           return;
         }
 
         const data = await res.json();
-        const rawText = "{" + (data.content?.[0]?.text ?? "");
+        const rawText: string = data.content?.[0]?.text ?? "";
+
+        if (!rawText) {
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "Risposta vuota" })));
+          controller.close();
+          return;
+        }
+
+        const start = rawText.indexOf("{");
         const end = rawText.lastIndexOf("}");
-        if (end === -1) {
-          controller.enqueue(encoder.encode(JSON.stringify({ error: "Risposta incompleta" })));
+
+        if (start === -1 || end === -1) {
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "Nessun JSON trovato" })));
           controller.close();
           return;
         }
 
         let parsed;
-        try { parsed = JSON.parse(rawText.slice(0, end + 1)); }
-        catch {
+        try {
+          parsed = JSON.parse(rawText.slice(start, end + 1));
+        } catch {
           controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON non valido" })));
           controller.close();
           return;
