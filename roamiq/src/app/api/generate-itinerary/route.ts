@@ -22,8 +22,8 @@ const PACE_MAP: Record<string, string> = {
   lento: "3 attività/giorno", equilibrato: "4 attività/giorno", intenso: "5+ attività/giorno",
 };
 const DINING_MAP: Record<string, string> = {
-  street: "street food", casual: "trattorie casual",
-  restaurant: "ristoranti curati", fine: "fine dining",
+  street: "street food e mercati locali", casual: "trattorie e bistrot tipici",
+  restaurant: "ristoranti curati con buone recensioni", fine: "ristoranti rinomati e fine dining",
 };
 
 export async function POST(req: Request) {
@@ -48,53 +48,40 @@ export async function POST(req: Request) {
 
   const foodInfo = [
     body.cuisines?.length ? `cucine: ${body.cuisines.join(", ")}` : "",
-    body.dietaryNeeds?.length ? `dieta: ${body.dietaryNeeds.join(", ")}` : "",
+    body.dietaryNeeds?.filter(d => d !== "nessuna").length ? `dieta: ${body.dietaryNeeds?.filter(d => d !== "nessuna").join(", ")}` : "",
     body.diningBudget ? `stile: ${DINING_MAP[body.diningBudget] ?? body.diningBudget}` : "",
   ].filter(Boolean).join(" | ");
 
-  const prompt = `Genera un itinerario di viaggio JSON per ${days} giorni a ${body.destination}.
-Dati: da ${body.departureCity}, ${body.travelers}, ${BUDGET_MAP[body.budget] ?? body.budget}, ${PACE_MAP[body.pace] ?? body.pace}, interessi: ${body.interests?.slice(0,3).join(", ")}.
-${foodInfo ? `Cibo: ${foodInfo}.` : ""}
-Date: ${dateArray.join(", ")}.
+  const prompt = `Sei un travel planner esperto con profonda conoscenza di ${body.destination}. Genera un itinerario di viaggio per ${days} giorni.
 
-Struttura JSON richiesta (compila con dati reali di ${body.destination}):
-{
-  "destination": "${body.destination}",
-  "country": "paese",
-  "emoji": "bandiera emoji",
-  "summary": "frase evocativa",
-  "totalCostMin": 400,
-  "totalCostMax": 700,
-  "days": [
-    {
-      "day": 1,
-      "date": "${dateArray[0]}",
-      "theme": "tema",
-      "activities": [
-        {"time":"09:00","name":"posto reale","description":"descrizione","duration":"2h","priceMin":0,"priceMax":15,"category":"cultura","tip":"consiglio","bookingRequired":false,"type":"activity"},
-        {"time":"13:00","name":"ristorante reale","description":"piatti tipici","duration":"1.5h","priceMin":15,"priceMax":35,"category":"food","tip":"cosa ordinare","bookingRequired":true,"type":"restaurant","cuisine":"tipo cucina"},
-        {"time":"15:00","name":"posto reale","description":"descrizione","duration":"2h","priceMin":10,"priceMax":25,"category":"cultura","tip":"consiglio","bookingRequired":true,"type":"activity"},
-        {"time":"20:00","name":"ristorante reale","description":"atmosfera serale","duration":"2h","priceMin":25,"priceMax":50,"category":"food","tip":"prenota in anticipo","bookingRequired":true,"type":"restaurant","cuisine":"tipo cucina"}
-      ]
-    }
-  ],
-  "hotels": [
-    {"name":"hotel reale","stars":3,"zone":"quartiere","pricePerNight":90,"why":"motivo"},
-    {"name":"hotel reale 2","stars":4,"zone":"quartiere","pricePerNight":140,"why":"motivo"}
-  ],
-  "localTips": ["tip1","tip2","tip3"],
-  "bestFor": "per chi è questo viaggio"
-}
-Genera tutti i ${days} giorni con questa struttura. Solo dati reali di ${body.destination}.`;
+DATI VIAGGIO:
+- Partenza: ${body.departureCity} → ${body.destination}
+- Date: ${dateArray.join(", ")}
+- Gruppo: ${body.travelers}
+- Budget: ${BUDGET_MAP[body.budget] ?? body.budget}
+- Ritmo: ${PACE_MAP[body.pace] ?? body.pace}
+- Interessi: ${body.interests?.slice(0,4).join(", ") || "cultura, food"}
+- Preferenze cibo: ${foodInfo || "cucina locale tipica"}
+
+REGOLE CRITICHE PER LA QUALITÀ:
+1. RISTORANTI: Cita SOLO ristoranti realmente famosi e verificati di ${body.destination}, con ottime recensioni su Google/TripAdvisor. MAI inventare nomi. Se non sei certo al 100% che un ristorante esiste e ha buone recensioni, NON citarlo.
+2. ATTRAZIONI: Solo luoghi reali e iconici di ${body.destination}. Niente posti inventati.
+3. NIGHTLIFE: Solo locali notturni reali (bar, club, lounge). MAI confondere sale giochi, centri massaggi o altri posti con locali notturni.
+4. SPA/BENESSERE: Solo centri benessere veri di qualità. MAI centri massaggi economici o non verificati.
+5. ESPERIENZE LOCALI: Includi esperienze autentiche dei locals (mercati, feste locali, quartieri autentici, artigiani, cucina di strada reale). Evita le solite attrazioni turistiche banali.
+6. VERIFICA: Prima di includere qualsiasi posto, chiediti: "Sono al 100% sicuro che questo posto esiste, è aperto e ha buone recensioni?" Se la risposta è no, NON includerlo.
+
+Rispondi SOLO con JSON valido:`;
 
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
-      // Primo byte immediato → evita timeout Vercel 25s
       controller.enqueue(encoder.encode(" "));
 
       try {
+        // Usa claude-sonnet per maggiore accuratezza fattuale
+        // con web_search abilitato per verificare i posti reali
         const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -103,26 +90,39 @@ Genera tutti i ${days} giorni con questa struttura. Solo dati reali di ${body.de
             "anthropic-version": "2023-06-01",
           },
           body: JSON.stringify({
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 6000,
+            model: "claude-sonnet-4-6",
+            max_tokens: 8000,
+            tools: [
+              {
+                type: "web_search_20250305",
+                name: "web_search",
+                max_uses: 5,
+              }
+            ],
             messages: [
               { role: "user", content: prompt },
-              // PREFILL: forza Claude a iniziare con { — garantisce JSON puro senza markdown
-              { role: "assistant", content: "{" },
+              {
+                role: "assistant",
+                content: `Utilizzerò la ricerca web per verificare i ristoranti e i locali più famosi di ${body.destination} prima di includerli nell'itinerario. Questo garantirà che tutti i posti siano reali e abbiano ottime recensioni.
+
+{`,
+              },
             ],
           }),
         });
 
         if (!claudeRes.ok) {
           const err = await claudeRes.text();
-          controller.enqueue(encoder.encode(JSON.stringify({ error: `Errore Claude ${claudeRes.status}: ${err.slice(0,100)}` })));
+          controller.enqueue(encoder.encode(JSON.stringify({ error: `Errore Claude: ${err.slice(0,100)}` })));
           controller.close();
           return;
         }
 
         const claudeData = await claudeRes.json();
-        // Con il prefill, Claude continua dal "{" — lo aggiungiamo noi
-        const rawText: string = "{" + (claudeData.content?.[0]?.text ?? "");
+
+        // Estrai il testo dalla risposta (può contenere tool_use blocks)
+        const textBlocks = claudeData.content?.filter((b: {type: string}) => b.type === "text") ?? [];
+        const rawText = "{" + (textBlocks.map((b: {text: string}) => b.text).join("") ?? "");
 
         if (!rawText || rawText === "{") {
           controller.enqueue(encoder.encode(JSON.stringify({ error: "Risposta AI vuota" })));
@@ -130,10 +130,9 @@ Genera tutti i ${days} giorni con questa struttura. Solo dati reali di ${body.de
           return;
         }
 
-        // Estrai JSON: dalla prima { all'ultima }
         const end = rawText.lastIndexOf("}");
         if (end === -1) {
-          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON incompleto nella risposta" })));
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON incompleto" })));
           controller.close();
           return;
         }
@@ -147,7 +146,7 @@ Genera tutti i ${days} giorni con questa struttura. Solo dati reali di ${body.de
           return;
         }
 
-        // Salva su Supabase (non bloccante)
+        // Salva su Supabase
         let tripId = "demo";
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
