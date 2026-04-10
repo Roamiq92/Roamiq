@@ -48,40 +48,93 @@ export async function POST(req: Request) {
 
   const foodInfo = [
     body.cuisines?.length ? `cucine: ${body.cuisines.join(", ")}` : "",
-    body.dietaryNeeds?.filter(d => d !== "nessuna").length ? `dieta: ${body.dietaryNeeds?.filter(d => d !== "nessuna").join(", ")}` : "",
+    body.dietaryNeeds?.filter(d => d !== "nessuna").length
+      ? `dieta: ${body.dietaryNeeds?.filter(d => d !== "nessuna").join(", ")}` : "",
     body.diningBudget ? `stile: ${DINING_MAP[body.diningBudget] ?? body.diningBudget}` : "",
   ].filter(Boolean).join(" | ");
 
-  const prompt = `Sei un travel planner esperto con profonda conoscenza di ${body.destination}. Genera un itinerario di viaggio per ${days} giorni.
+  const systemPrompt = `Sei un travel planner esperto. Quando generi itinerari:
+- Usa SOLO ristoranti, hotel e locali che esistono realmente e hanno ottime recensioni
+- MAI inventare nomi di posti
+- Per nightlife: solo bar, pub e club veri - MAI sale giochi o bowling
+- Per spa: solo centri benessere di qualità verificati
+- Includi esperienze autentiche dei locals (mercati, artigiani, cucina di strada)
+- Rispondi SEMPRE e SOLO con JSON valido, senza testo aggiuntivo`;
 
-DATI VIAGGIO:
-- Partenza: ${body.departureCity} → ${body.destination}
-- Date: ${dateArray.join(", ")}
-- Gruppo: ${body.travelers}
-- Budget: ${BUDGET_MAP[body.budget] ?? body.budget}
-- Ritmo: ${PACE_MAP[body.pace] ?? body.pace}
-- Interessi: ${body.interests?.slice(0,4).join(", ") || "cultura, food"}
-- Preferenze cibo: ${foodInfo || "cucina locale tipica"}
+  const prompt = `Genera un itinerario di ${days} giorni a ${body.destination}.
 
-REGOLE CRITICHE PER LA QUALITÀ:
-1. RISTORANTI: Cita SOLO ristoranti realmente famosi e verificati di ${body.destination}, con ottime recensioni su Google/TripAdvisor. MAI inventare nomi. Se non sei certo al 100% che un ristorante esiste e ha buone recensioni, NON citarlo.
-2. ATTRAZIONI: Solo luoghi reali e iconici di ${body.destination}. Niente posti inventati.
-3. NIGHTLIFE: Solo locali notturni reali (bar, club, lounge). MAI confondere sale giochi, centri massaggi o altri posti con locali notturni.
-4. SPA/BENESSERE: Solo centri benessere veri di qualità. MAI centri massaggi economici o non verificati.
-5. ESPERIENZE LOCALI: Includi esperienze autentiche dei locals (mercati, feste locali, quartieri autentici, artigiani, cucina di strada reale). Evita le solite attrazioni turistiche banali.
-6. VERIFICA: Prima di includere qualsiasi posto, chiediti: "Sono al 100% sicuro che questo posto esiste, è aperto e ha buone recensioni?" Se la risposta è no, NON includerlo.
+Dati: da ${body.departureCity}, ${body.travelers}, ${BUDGET_MAP[body.budget] ?? body.budget}, ${PACE_MAP[body.pace] ?? body.pace}
+Interessi: ${body.interests?.slice(0,4).join(", ") || "cultura, food"}
+Cibo: ${foodInfo || "cucina locale tipica"}
+Date: ${dateArray.join(", ")}
 
-Rispondi SOLO con JSON valido:`;
+Usa la ricerca web per verificare che i ristoranti e i posti esistano davvero prima di includerli.
+
+Poi rispondi con questo JSON (sostituisci con dati reali verificati):
+{
+  "destination": "${body.destination}",
+  "country": "paese",
+  "emoji": "🏳️",
+  "summary": "frase evocativa 1 riga",
+  "totalCostMin": 400,
+  "totalCostMax": 700,
+  "days": [
+    {
+      "day": 1,
+      "date": "${dateArray[0]}",
+      "theme": "tema del giorno",
+      "activities": [
+        {
+          "time": "09:00",
+          "name": "nome posto REALE verificato",
+          "description": "descrizione 1-2 frasi con contesto autentico",
+          "duration": "2h",
+          "priceMin": 0,
+          "priceMax": 15,
+          "category": "cultura",
+          "tip": "consiglio insider pratico",
+          "bookingRequired": false,
+          "type": "activity"
+        },
+        {
+          "time": "13:00",
+          "name": "nome ristorante REALE verificato",
+          "description": "piatti tipici e atmosfera",
+          "duration": "1.5h",
+          "priceMin": 15,
+          "priceMax": 35,
+          "category": "food",
+          "tip": "cosa ordinare",
+          "bookingRequired": true,
+          "type": "restaurant",
+          "cuisine": "tipo cucina"
+        }
+      ]
+    }
+  ],
+  "hotels": [
+    {
+      "name": "nome hotel REALE verificato",
+      "stars": 3,
+      "zone": "quartiere",
+      "pricePerNight": 90,
+      "why": "perché consigliato per questo profilo"
+    }
+  ],
+  "localTips": ["tip autentico 1", "tip autentico 2", "tip autentico 3"],
+  "bestFor": "per chi è questo viaggio"
+}
+
+Genera TUTTI i ${days} giorni, ognuno con almeno 3 attività + pranzo + cena. Solo JSON.`;
 
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
+      // Primo byte immediato → evita timeout Vercel 25s
       controller.enqueue(encoder.encode(" "));
 
       try {
-        // Usa claude-sonnet per maggiore accuratezza fattuale
-        // con web_search abilitato per verificare i posti reali
         const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: {
@@ -92,56 +145,54 @@ Rispondi SOLO con JSON valido:`;
           body: JSON.stringify({
             model: "claude-sonnet-4-6",
             max_tokens: 8000,
-            tools: [
-              {
-                type: "web_search_20250305",
-                name: "web_search",
-                max_uses: 5,
-              }
-            ],
-            messages: [
-              { role: "user", content: prompt },
-              {
-                role: "assistant",
-                content: `Utilizzerò la ricerca web per verificare i ristoranti e i locali più famosi di ${body.destination} prima di includerli nell'itinerario. Questo garantirà che tutti i posti siano reali e abbiano ottime recensioni.
-
-{`,
-              },
-            ],
+            system: systemPrompt,
+            tools: [{
+              type: "web_search_20250305",
+              name: "web_search",
+              max_uses: 4,
+            }],
+            messages: [{ role: "user", content: prompt }],
           }),
         });
 
         if (!claudeRes.ok) {
           const err = await claudeRes.text();
-          controller.enqueue(encoder.encode(JSON.stringify({ error: `Errore Claude: ${err.slice(0,100)}` })));
+          controller.enqueue(encoder.encode(JSON.stringify({
+            error: `Errore Claude ${claudeRes.status}: ${err.slice(0, 150)}`
+          })));
           controller.close();
           return;
         }
 
         const claudeData = await claudeRes.json();
 
-        // Estrai il testo dalla risposta (può contenere tool_use blocks)
-        const textBlocks = claudeData.content?.filter((b: {type: string}) => b.type === "text") ?? [];
-        const rawText = "{" + (textBlocks.map((b: {text: string}) => b.text).join("") ?? "");
+        // Estrai solo i blocchi di testo (ignora tool_use blocks)
+        const textBlocks = (claudeData.content ?? [])
+          .filter((b: { type: string }) => b.type === "text")
+          .map((b: { text: string }) => b.text)
+          .join("");
 
-        if (!rawText || rawText === "{") {
+        if (!textBlocks) {
           controller.enqueue(encoder.encode(JSON.stringify({ error: "Risposta AI vuota" })));
           controller.close();
           return;
         }
 
-        const end = rawText.lastIndexOf("}");
-        if (end === -1) {
-          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON incompleto" })));
+        // Estrai JSON dalla risposta
+        const start = textBlocks.indexOf("{");
+        const end = textBlocks.lastIndexOf("}");
+
+        if (start === -1 || end === -1 || end <= start) {
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "Nessun JSON trovato nella risposta" })));
           controller.close();
           return;
         }
 
         let itinerary;
         try {
-          itinerary = JSON.parse(rawText.slice(0, end + 1));
+          itinerary = JSON.parse(textBlocks.slice(start, end + 1));
         } catch {
-          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON non parsabile" })));
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON non valido" })));
           controller.close();
           return;
         }
