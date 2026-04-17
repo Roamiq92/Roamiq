@@ -5,21 +5,16 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase-browser";
 
-/* ── Types ── */
 interface Activity {
   time: string; name: string; description: string; duration: string;
   priceMin: number; priceMax: number; category: string; tip: string;
   bookingRequired: boolean; type?: string; cuisine?: string;
 }
 interface Day { day: number; date: string; theme: string; activities: Activity[]; }
-interface Hotel {
-  name: string; stars: number; zone: string; pricePerNight: number;
-  why: string; highlights?: string[];
-}
+interface Hotel { name: string; stars: number; zone: string; pricePerNight: number; why: string; highlights?: string[]; }
 interface Transport {
   type: string; from: string; to: string; duration: string;
-  estimatedPriceMin: number; estimatedPriceMax: number;
-  operators?: string[]; tip?: string;
+  estimatedPriceMin: number; estimatedPriceMax: number; operators?: string[]; tip?: string;
 }
 interface Itinerary {
   destination: string; country: string; emoji: string; summary: string;
@@ -32,7 +27,6 @@ interface TripRecord {
   travelers: string; budget: string; itinerary: Itinerary;
 }
 
-/* ── URL builders ── */
 function bookingUrl(dest: string, checkIn: string, checkOut: string, travelers: string) {
   const adults = travelers === "coppia" ? 2 : travelers === "famiglia" ? 3 : travelers === "amici" ? 3 : 1;
   return `https://www.booking.com/searchresults.it.html?ss=${encodeURIComponent(dest)}&checkin=${checkIn}&checkout=${checkOut}&group_adults=${adults}&no_rooms=1&lang=it&selected_currency=EUR`;
@@ -44,8 +38,8 @@ function skyscannerUrl(from: string, to: string, date: string, travelers: string
   const adults = travelers === "coppia" ? 2 : travelers === "famiglia" ? 3 : travelers === "amici" ? 3 : 1;
   return `https://www.skyscanner.it/transport/voli/${encodeURIComponent(from)}/${encodeURIComponent(to)}/${date.replace(/-/g, "")}/?adults=${adults}&currency=EUR`;
 }
-function trenitaliUrl(from: string, to: string, date: string) {
-  return `https://www.trenitalia.com/it/acquista/promo-last-minute.html?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&date=${date}`;
+function trainlineUrl(from: string, to: string, date: string) {
+  return `https://www.trainline.eu/search/${encodeURIComponent(from)}/${encodeURIComponent(to)}/${date}`;
 }
 function openTableUrl(name: string, dest: string, date: string, size: number) {
   return `https://www.opentable.it/s/?term=${encodeURIComponent(name + " " + dest)}&covers=${size}&dateTime=${date}T20:00`;
@@ -54,7 +48,6 @@ function googleMapsUrl(q: string) {
   return `https://www.google.com/maps/search/${encodeURIComponent(q)}`;
 }
 
-/* ── Helpers ── */
 const CAT: Record<string, { icon: string; color: string }> = {
   cultura:   { icon: "🏛️", color: "#F5F0E8" }, food:      { icon: "🍽️", color: "#FFF8EE" },
   natura:    { icon: "🌿", color: "#F0FDF4" }, nightlife: { icon: "🎶", color: "#FDF4FF" },
@@ -88,9 +81,7 @@ function LoginGate({ tab }: { tab: string }) {
         <h3 className="trip-gate-title">
           {tab === "hotels" ? "Vedi gli hotel selezionati" : tab === "transport" ? "Vedi voli e trasporti" : "Prenota il tuo viaggio"}
         </h3>
-        <p className="trip-gate-sub">
-          Crea un account gratuito per accedere a hotel, trasporti e prenotazioni — tutto in un posto.
-        </p>
+        <p className="trip-gate-sub">Crea un account gratuito per accedere a hotel, trasporti e prenotazioni.</p>
         <div className="trip-gate-actions">
           <Link href="/register" className="trip-gate-btn-primary">Registrati gratis →</Link>
           <Link href="/login" className="trip-gate-btn-ghost">Ho già un account</Link>
@@ -117,16 +108,11 @@ export default function TripPage() {
         const { data: { user } } = await supabase.auth.getUser();
         setIsLoggedIn(!!user);
       } catch { /* ignora */ }
-
       const cached = sessionStorage.getItem("roamiq_last_trip");
       if (cached) {
         try {
           const parsed = JSON.parse(cached);
-          if (id === "demo" || parsed.id === id) {
-            setTrip(parsed as TripRecord);
-            setLoading(false);
-            return;
-          }
+          if (id === "demo" || parsed.id === id) { setTrip(parsed as TripRecord); setLoading(false); return; }
         } catch { /* ignora */ }
       }
       if (id !== "demo") {
@@ -149,15 +135,13 @@ export default function TripPage() {
   const totalDays = itin.days.length;
   const daysCost = Math.round(itin.totalCostMin / totalDays);
   const size = partySize(trip.travelers);
-  const isLocked = (tab: string) => !isLoggedIn && ["hotels", "transport", "book"].includes(tab);
-
+  const isLocked = (tab: string) => !isLoggedIn && ["hotels","transport","book"].includes(tab);
+  const transport = itin.transport;
   const allRestaurants = itin.days.flatMap(d => d.activities).filter(a => a.type === "restaurant" || a.category === "food");
   const allBookable = itin.days.flatMap(d => d.activities).filter(a => a.bookingRequired && a.type !== "restaurant" && a.category !== "food");
-  const transport = itin.transport;
 
   return (
     <div className="trip-page">
-      {/* NAV */}
       <nav className="trip-nav">
         <Link href="/" className="ob-logo">ROAM<span>IQ</span></Link>
         <div className="trip-nav-meta">
@@ -166,14 +150,11 @@ export default function TripPage() {
           <span>{totalDays} giorni</span>
         </div>
         <div className="trip-nav-actions">
-          {isLoggedIn
-            ? <Link href="/dashboard" className="trip-btn-ghost">I miei viaggi</Link>
-            : <Link href="/register" className="trip-btn-ghost">Registrati gratis</Link>}
+          {isLoggedIn ? <Link href="/dashboard" className="trip-btn-ghost">I miei viaggi</Link> : <Link href="/register" className="trip-btn-ghost">Registrati gratis</Link>}
           <button className="trip-btn-primary" onClick={() => setActiveTab("book")}>Prenota tutto →</button>
         </div>
       </nav>
 
-      {/* HERO */}
       <header className="trip-hero">
         <div className="trip-hero-bg" style={{ background: "linear-gradient(135deg, #1A1209 0%, #2D2416 50%, #1A1209 100%)" }} />
         <div className="trip-hero-content">
@@ -196,28 +177,22 @@ export default function TripPage() {
         </div>
       </header>
 
-      {/* TABS */}
       <div className="trip-tabs-bar">
         <div className="trip-tabs">
           {([
-            { id: "itinerary",  label: "📅 Itinerario" },
-            { id: "transport",  label: isLocked("transport") ? "🔒 Trasporti" : "✈️ Trasporti" },
-            { id: "hotels",     label: isLocked("hotels") ? "🔒 Hotel" : "🏨 Hotel" },
-            { id: "tips",       label: "💡 Consigli" },
-            { id: "book",       label: isLocked("book") ? "🔒 Prenota" : "🎫 Prenota" },
+            { id: "itinerary", label: "📅 Itinerario" },
+            { id: "transport", label: isLocked("transport") ? "🔒 Trasporti" : "✈️ Trasporti" },
+            { id: "hotels",    label: isLocked("hotels") ? "🔒 Hotel" : "🏨 Hotel" },
+            { id: "tips",      label: "💡 Consigli" },
+            { id: "book",      label: isLocked("book") ? "🔒 Prenota" : "🎫 Prenota" },
           ] as const).map((tab) => (
-            <button key={tab.id}
-              className={`trip-tab ${activeTab === tab.id ? "active" : ""} ${isLocked(tab.id) ? "locked" : ""}`}
-              onClick={() => setActiveTab(tab.id)}>
-              {tab.label}
-            </button>
+            <button key={tab.id} className={`trip-tab ${activeTab === tab.id ? "active" : ""} ${isLocked(tab.id) ? "locked" : ""}`} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>
           ))}
         </div>
       </div>
 
       <main className="trip-main">
 
-        {/* ═══ ITINERARY ═══ */}
         {activeTab === "itinerary" && (
           <div className="trip-itinerary">
             <div className="trip-day-selector">
@@ -280,15 +255,13 @@ export default function TripPage() {
           </div>
         )}
 
-        {/* ═══ TRANSPORT ═══ */}
         {activeTab === "transport" && (
           isLocked("transport") ? <LoginGate tab="transport" /> : (
             <div className="trip-transport">
               <div className="trip-section-header">
                 <h2 className="trip-section-title">Voli e trasporti</h2>
-                <p className="trip-section-sub">Opzioni di viaggio da {trip.destination} a {itin.destination}.</p>
+                <p className="trip-section-sub">Le migliori opzioni da {trip.destination} a {itin.destination}.</p>
               </div>
-
               {transport?.outbound && (
                 <div className="trip-transport-card">
                   <div className="trip-transport-header">
@@ -310,13 +283,10 @@ export default function TripPage() {
                   {transport.outbound.tip && <div className="trip-activity-tip" style={{ margin: "0.75rem 0 0" }}><span>💡</span><span>{transport.outbound.tip}</span></div>}
                   <div className="trip-activity-actions" style={{ marginTop: "0.75rem" }}>
                     <a href={skyscannerUrl(transport.outbound.from, transport.outbound.to, trip.start_date, trip.travelers)} target="_blank" rel="noopener noreferrer" className="trip-action-btn book">✈️ Cerca voli andata</a>
-                    {transport.outbound.type === "treno" && (
-                      <a href={trenitaliUrl(transport.outbound.from, transport.outbound.to, trip.start_date)} target="_blank" rel="noopener noreferrer" className="trip-action-btn maps">🚆 Trenitalia</a>
-                    )}
+                    <a href={trainlineUrl(transport.outbound.from, transport.outbound.to, trip.start_date)} target="_blank" rel="noopener noreferrer" className="trip-action-btn maps">🚆 Cerca treni</a>
                   </div>
                 </div>
               )}
-
               {transport?.return && (
                 <div className="trip-transport-card" style={{ marginTop: "1rem" }}>
                   <div className="trip-transport-header">
@@ -332,32 +302,31 @@ export default function TripPage() {
                   </div>
                   <div className="trip-activity-actions" style={{ marginTop: "0.75rem" }}>
                     <a href={skyscannerUrl(transport.return.from, transport.return.to, trip.end_date, trip.travelers)} target="_blank" rel="noopener noreferrer" className="trip-action-btn book">✈️ Cerca voli ritorno</a>
+                    <a href={trainlineUrl(transport.return.from, transport.return.to, trip.end_date)} target="_blank" rel="noopener noreferrer" className="trip-action-btn maps">🚆 Cerca treni</a>
                   </div>
                 </div>
               )}
-
               {transport?.local && (
                 <div className="trip-hotel-note" style={{ marginTop: "1rem" }}>
                   <span>🚇</span><span><strong>Trasporti locali:</strong> {transport.local}</span>
                 </div>
               )}
-
               {!transport && (
                 <div className="trip-hotel-note">
-                  <span>💡</span><span>Cerca i voli su Skyscanner per le migliori tariffe da {trip.destination} a {itin.destination}.</span>
+                  <span>💡</span>
+                  <span>Cerca voli su Skyscanner o treni su Trainline per le migliori tariffe da {trip.destination} a {itin.destination}.</span>
                 </div>
               )}
             </div>
           )
         )}
 
-        {/* ═══ HOTELS ═══ */}
         {activeTab === "hotels" && (
           isLocked("hotels") ? <LoginGate tab="hotels" /> : (
             <div className="trip-hotels">
               <div className="trip-section-header">
                 <h2 className="trip-section-title">Hotel selezionati dall&apos;AI</h2>
-                <p className="trip-section-sub">Verificati e consigliati per il tuo profilo. Prenota direttamente.</p>
+                <p className="trip-section-sub">Verificati e consigliati per il tuo profilo.</p>
               </div>
               <div className="trip-hotels-grid">
                 {itin.hotels.map((hotel, i) => (
@@ -383,11 +352,7 @@ export default function TripPage() {
                         <div className="trip-hotel-price">da €{hotel.pricePerNight}</div>
                         <div className="trip-hotel-price-label">a notte</div>
                       </div>
-                      <a href={bookingUrl(hotel.name + " " + itin.destination, trip.start_date, trip.end_date, trip.travelers)}
-                        target="_blank" rel="noopener noreferrer"
-                        className="trip-hotel-btn" style={{ textDecoration: "none", textAlign: "center" }}>
-                        Verifica prezzi →
-                      </a>
+                      <a href={bookingUrl(hotel.name + " " + itin.destination, trip.start_date, trip.end_date, trip.travelers)} target="_blank" rel="noopener noreferrer" className="trip-hotel-btn" style={{ textDecoration: "none", textAlign: "center" }}>Verifica prezzi →</a>
                     </div>
                   </div>
                 ))}
@@ -399,7 +364,6 @@ export default function TripPage() {
           )
         )}
 
-        {/* ═══ TIPS ═══ */}
         {activeTab === "tips" && (
           <div className="trip-tips">
             <div className="trip-section-header">
@@ -421,7 +385,6 @@ export default function TripPage() {
           </div>
         )}
 
-        {/* ═══ BOOK ═══ */}
         {activeTab === "book" && (
           isLocked("book") ? <LoginGate tab="book" /> : (
             <div className="trip-book">
@@ -429,24 +392,25 @@ export default function TripPage() {
                 <h2 className="trip-section-title">Prenota il tuo viaggio</h2>
                 <p className="trip-section-sub">Tutto in un posto. Prezzi reali, zero sorprese.</p>
               </div>
-
               <div className="trip-book-section">
-                <div className="trip-book-section-title">✈️ Volo andata e ritorno</div>
+                <div className="trip-book-section-title">✈️ Volo e treno</div>
                 <div className="trip-book-card">
                   <div className="trip-book-card-info">
-                    <div className="trip-book-card-name">Cerca i migliori voli</div>
+                    <div className="trip-book-card-name">Voli — Skyscanner</div>
                     <div className="trip-book-card-desc">{trip.destination} → {itin.destination} · {fmt(trip.start_date)} → {fmt(trip.end_date)}</div>
-                    <div className="trip-book-card-price">
-                      {transport?.outbound ? `da €${transport.outbound.estimatedPriceMin} p.p.` : "Prezzi variabili"}
-                    </div>
+                    <div className="trip-book-card-price">{transport?.outbound ? `da €${transport.outbound.estimatedPriceMin} p.p.` : "Prezzi variabili"}</div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: ".5rem" }}>
-                    <a href={skyscannerUrl(trip.destination, itin.destination, trip.start_date, trip.travelers)} target="_blank" rel="noopener noreferrer" className="trip-book-btn">Cerca voli →</a>
-                    <a href={trenitaliUrl(trip.destination, itin.destination, trip.start_date)} target="_blank" rel="noopener noreferrer" className="trip-book-btn" style={{ background: "var(--ink)", fontSize: ".8rem" }}>🚆 Treno →</a>
+                  <a href={skyscannerUrl(trip.destination, itin.destination, trip.start_date, trip.travelers)} target="_blank" rel="noopener noreferrer" className="trip-book-btn">Cerca voli →</a>
+                </div>
+                <div className="trip-book-card">
+                  <div className="trip-book-card-info">
+                    <div className="trip-book-card-name">Treni — Trainline</div>
+                    <div className="trip-book-card-desc">Confronta tutte le opzioni ferroviarie internazionali</div>
+                    <div className="trip-book-card-price">{transport?.outbound ? `da €${transport.outbound.estimatedPriceMin} p.p.` : "Prezzi variabili"}</div>
                   </div>
+                  <a href={trainlineUrl(trip.destination, itin.destination, trip.start_date)} target="_blank" rel="noopener noreferrer" className="trip-book-btn" style={{ background: "var(--ink)" }}>Cerca treni →</a>
                 </div>
               </div>
-
               <div className="trip-book-section">
                 <div className="trip-book-section-title">🏨 Hotel</div>
                 {itin.hotels.map((hotel, i) => (
@@ -460,7 +424,6 @@ export default function TripPage() {
                   </div>
                 ))}
               </div>
-
               {allBookable.length > 0 && (
                 <div className="trip-book-section">
                   <div className="trip-book-section-title">🎭 Esperienze</div>
@@ -476,7 +439,6 @@ export default function TripPage() {
                   ))}
                 </div>
               )}
-
               {allRestaurants.length > 0 && (
                 <div className="trip-book-section">
                   <div className="trip-book-section-title">🍽️ Ristoranti</div>
@@ -490,14 +452,13 @@ export default function TripPage() {
                           <div className="trip-book-card-desc">{act.cuisine && `${act.cuisine} · `}{act.tip}</div>
                           <div className="trip-book-card-price">€{act.priceMin}–€{act.priceMax} p.p.</div>
                         </div>
-                        <a href={openTableUrl(act.name, itin.destination, date, size)} target="_blank" rel="noopener noreferrer" className="trip-book-btn">Prenota →</a>
+                        <a href={openTableUrl(act.name, itin.destination, date, size)} target="_blank" rel="noopener noreferrer" className="trip-book-btn">Prenota tavolo →</a>
                       </div>
                     );
                   })}
                 </div>
               )}
-
-              <div className="trip-hotel-note">
+              <div className="trip-hotel-note" style={{ marginTop: "1rem" }}>
                 <span>🤝</span><span>ROAMIQ riceve una piccola commissione per ogni prenotazione. Per te il prezzo è sempre lo stesso.</span>
               </div>
             </div>
@@ -515,6 +476,7 @@ export default function TripPage() {
             </div>
           </div>
         )}
+
       </main>
 
       <div className="trip-sticky-bar">
