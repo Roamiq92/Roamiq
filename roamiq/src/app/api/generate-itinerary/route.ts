@@ -22,8 +22,8 @@ const PACE_MAP: Record<string, string> = {
   lento: "3 attività/giorno", equilibrato: "4 attività/giorno", intenso: "5+ attività/giorno",
 };
 const DINING_MAP: Record<string, string> = {
-  street: "street food e mercati locali", casual: "trattorie e bistrot tipici",
-  restaurant: "ristoranti curati con buone recensioni", fine: "ristoranti rinomati e fine dining",
+  street: "street food e mercati", casual: "trattorie tipiche",
+  restaurant: "ristoranti curati", fine: "fine dining",
 };
 
 export async function POST(req: Request) {
@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   try { body = await req.json(); }
   catch { return Response.json({ error: "Body non valido" }, { status: 400 }); }
 
-  const days = Math.max(1, Math.min(7, Math.ceil(
+  const days = Math.max(1, Math.min(5, Math.ceil(
     (new Date(body.endDate).getTime() - new Date(body.startDate).getTime()) / 86400000
   )));
 
@@ -53,24 +53,23 @@ export async function POST(req: Request) {
     body.diningBudget ? `stile: ${DINING_MAP[body.diningBudget] ?? body.diningBudget}` : "",
   ].filter(Boolean).join(" | ");
 
-  const systemPrompt = `Sei un travel planner esperto. Quando generi itinerari:
-- Usa SOLO ristoranti, hotel e locali che esistono realmente e hanno ottime recensioni
-- MAI inventare nomi di posti
-- Per nightlife: solo bar, pub e club veri - MAI sale giochi o bowling
-- Per spa: solo centri benessere di qualità verificati
-- Includi esperienze autentiche dei locals (mercati, artigiani, cucina di strada)
-- Rispondi SEMPRE e SOLO con JSON valido, senza testo aggiuntivo`;
+  const prompt = `Sei un travel planner esperto di ${body.destination}. Genera un itinerario di ${days} giorni.
 
-  const prompt = `Genera un itinerario di ${days} giorni a ${body.destination}.
+VIAGGIO: ${body.departureCity} → ${body.destination} | ${body.travelers} | ${BUDGET_MAP[body.budget] ?? body.budget} | ${PACE_MAP[body.pace] ?? body.pace}
+INTERESSI: ${body.interests?.slice(0,4).join(", ") || "cultura, food"}
+CIBO: ${foodInfo || "cucina locale"}
+DATE: ${dateArray.join(", ")}
 
-Dati: da ${body.departureCity}, ${body.travelers}, ${BUDGET_MAP[body.budget] ?? body.budget}, ${PACE_MAP[body.pace] ?? body.pace}
-Interessi: ${body.interests?.slice(0,4).join(", ") || "cultura, food"}
-Cibo: ${foodInfo || "cucina locale tipica"}
-Date: ${dateArray.join(", ")}
+REGOLE ASSOLUTE — violazioni non accettate:
+- Cita SOLO ristoranti, bar e hotel di ${body.destination} che esistono realmente e sono famosi/verificati
+- Per NIGHTLIFE: solo bar, pub, jazz club, club veri — MAI sale giochi, bowling, biliardi
+- Per SPA/RELAX: solo centri benessere o hotel spa di qualità — MAI centri massaggi cinesi
+- Per RISTORANTI: solo locali con almeno 4 stelle Google, ben noti a ${body.destination}
+- Includi esperienze AUTENTICHE dei locals: mercati rionali, botteghe artigiane, sagre, piazze di quartiere
+- Se non sei CERTO al 100% che un posto esiste, NON includerlo — usa un'alternativa sicura
+- Rispondi SOLO con JSON valido
 
-Usa la ricerca web per verificare che i ristoranti e i posti esistano davvero prima di includerli.
-
-Poi rispondi con questo JSON (sostituisci con dati reali verificati):
+JSON da compilare (dati reali di ${body.destination}):
 {
   "destination": "${body.destination}",
   "country": "paese",
@@ -82,56 +81,29 @@ Poi rispondi con questo JSON (sostituisci con dati reali verificati):
     {
       "day": 1,
       "date": "${dateArray[0]}",
-      "theme": "tema del giorno",
+      "theme": "tema",
       "activities": [
-        {
-          "time": "09:00",
-          "name": "nome posto REALE verificato",
-          "description": "descrizione 1-2 frasi con contesto autentico",
-          "duration": "2h",
-          "priceMin": 0,
-          "priceMax": 15,
-          "category": "cultura",
-          "tip": "consiglio insider pratico",
-          "bookingRequired": false,
-          "type": "activity"
-        },
-        {
-          "time": "13:00",
-          "name": "nome ristorante REALE verificato",
-          "description": "piatti tipici e atmosfera",
-          "duration": "1.5h",
-          "priceMin": 15,
-          "priceMax": 35,
-          "category": "food",
-          "tip": "cosa ordinare",
-          "bookingRequired": true,
-          "type": "restaurant",
-          "cuisine": "tipo cucina"
-        }
+        {"time":"09:00","name":"POSTO REALE","description":"descrizione autentica","duration":"2h","priceMin":0,"priceMax":15,"category":"cultura","tip":"consiglio insider","bookingRequired":false,"type":"activity"},
+        {"time":"13:00","name":"RISTORANTE REALE famoso","description":"piatti tipici","duration":"1.5h","priceMin":15,"priceMax":35,"category":"food","tip":"cosa ordinare","bookingRequired":true,"type":"restaurant","cuisine":"tipo"},
+        {"time":"15:30","name":"POSTO REALE","description":"descrizione","duration":"1.5h","priceMin":0,"priceMax":10,"category":"cultura","tip":"consiglio","bookingRequired":false,"type":"activity"},
+        {"time":"20:00","name":"RISTORANTE/BAR REALE","description":"atmosfera serale","duration":"2h","priceMin":20,"priceMax":45,"category":"food","tip":"prenota","bookingRequired":true,"type":"restaurant","cuisine":"tipo"}
       ]
     }
   ],
   "hotels": [
-    {
-      "name": "nome hotel REALE verificato",
-      "stars": 3,
-      "zone": "quartiere",
-      "pricePerNight": 90,
-      "why": "perché consigliato per questo profilo"
-    }
+    {"name":"HOTEL REALE","stars":3,"zone":"quartiere","pricePerNight":90,"why":"motivo"},
+    {"name":"HOTEL REALE 2","stars":4,"zone":"quartiere","pricePerNight":140,"why":"motivo"}
   ],
-  "localTips": ["tip autentico 1", "tip autentico 2", "tip autentico 3"],
+  "localTips": ["tip autentico 1","tip autentico 2","tip autentico 3"],
   "bestFor": "per chi è questo viaggio"
 }
 
-Genera TUTTI i ${days} giorni, ognuno con almeno 3 attività + pranzo + cena. Solo JSON.`;
+Genera TUTTI i ${days} giorni con questa struttura. Solo JSON.`;
 
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     async start(controller) {
-      // Primo byte immediato → evita timeout Vercel 25s
       controller.enqueue(encoder.encode(" "));
 
       try {
@@ -144,55 +116,45 @@ Genera TUTTI i ${days} giorni, ognuno con almeno 3 attività + pranzo + cena. So
           },
           body: JSON.stringify({
             model: "claude-sonnet-4-6",
-            max_tokens: 8000,
-            system: systemPrompt,
-            tools: [{
-              type: "web_search_20250305",
-              name: "web_search",
-              max_uses: 4,
-            }],
-            messages: [{ role: "user", content: prompt }],
+            max_tokens: 7000,
+            messages: [
+              { role: "user", content: prompt },
+              // Prefill funziona con sonnet SENZA tools
+              { role: "assistant", content: "{" },
+            ],
           }),
         });
 
         if (!claudeRes.ok) {
           const err = await claudeRes.text();
           controller.enqueue(encoder.encode(JSON.stringify({
-            error: `Errore Claude ${claudeRes.status}: ${err.slice(0, 150)}`
+            error: `Errore Claude ${claudeRes.status}: ${err.slice(0, 100)}`
           })));
           controller.close();
           return;
         }
 
         const claudeData = await claudeRes.json();
+        const rawText = "{" + (claudeData.content?.[0]?.text ?? "");
 
-        // Estrai solo i blocchi di testo (ignora tool_use blocks)
-        const textBlocks = (claudeData.content ?? [])
-          .filter((b: { type: string }) => b.type === "text")
-          .map((b: { text: string }) => b.text)
-          .join("");
-
-        if (!textBlocks) {
+        if (!rawText || rawText === "{") {
           controller.enqueue(encoder.encode(JSON.stringify({ error: "Risposta AI vuota" })));
           controller.close();
           return;
         }
 
-        // Estrai JSON dalla risposta
-        const start = textBlocks.indexOf("{");
-        const end = textBlocks.lastIndexOf("}");
-
-        if (start === -1 || end === -1 || end <= start) {
-          controller.enqueue(encoder.encode(JSON.stringify({ error: "Nessun JSON trovato nella risposta" })));
+        const end = rawText.lastIndexOf("}");
+        if (end === -1) {
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON incompleto" })));
           controller.close();
           return;
         }
 
         let itinerary;
         try {
-          itinerary = JSON.parse(textBlocks.slice(start, end + 1));
+          itinerary = JSON.parse(rawText.slice(0, end + 1));
         } catch {
-          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON non valido" })));
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "JSON non parsabile" })));
           controller.close();
           return;
         }
